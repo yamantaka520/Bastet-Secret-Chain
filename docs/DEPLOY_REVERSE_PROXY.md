@@ -153,6 +153,33 @@ Verified both ways on 2026-09-04:
   `cloudflared` on loopback, as designed. The key was lent to the host for the
   test through a 10-minute agent forward, never copied.
 
+**GUI clients without `ProxyCommand` (SecureCRT, PuTTY, MobaXterm…).** Run
+`cloudflared` as a local listener and point the client at it:
+
+```
+cloudflared access tcp --hostname ssh.bastet.tw --url 127.0.0.1:2222
+```
+
+then connect the client to host `127.0.0.1`, port `2222`, protocol SSH2, user
+`CatWhiskers`, public-key authentication with the same key. `cloudflared`
+must be running while the session is open; on Windows a logon-triggered
+scheduled task (`schtasks /Create /SC ONLOGON /TN "cloudflared ssh.bastet.tw"
+/TR "\"C:\Program Files (x86)\cloudflared\cloudflared.exe\" access tcp
+--hostname ssh.bastet.tw --url 127.0.0.1:2222"`) keeps it up. The Access
+check happens at Cloudflare using the *client machine's* public IP, exactly
+as with `ProxyCommand`. On first connection the client shows the host key of
+`hermes-agent`; compare it with the fingerprints recorded below before
+accepting.
+
+Host key fingerprints of `hermes-agent` (read from `/etc/ssh` on the host on
+2026-09-04; sshd offers all three):
+
+```
+ED25519  SHA256:fifrQkgqWKDW+V0E8KV0Dq7ILuOuhlcnr4GqbJR3LBQ   MD5:89:32:0d:73:6f:46:b3:92:68:32:b5:6f:79:71:b8:29
+ECDSA    SHA256:29hLoIc4S816ss6ZD7ihy4qNQV9jseQKGkbhyUIBetE
+RSA      SHA256:/wjFi9wpwwpGSMmfgbbG6qCFbVC+rr4ebsJLfADMFPQ
+```
+
 Client caveat: on a machine without an IPv6 default route, `cloudflared
 access ssh` dials the edge's AAAA first and fails with `no route to host`
 instead of falling back to A. The operator's Mac hit exactly this; the fix is
