@@ -1,6 +1,6 @@
 # ADR 0005 — Approval and reminder model
 
-- **Status:** accepted, 2026-09-03
+- **Status:** accepted, 2026-09-03; §4 implemented for Telegram on 2026-09-04 (`bsc serve --telegram-*`, outbound `sendMessage` + `getUpdates` long-poll, decisions recorded as `external:telegram:<user id>`)
 - **Deciders:** project owner
 - **Related:** [ADR 0002](0002-reference-urls-are-not-credentials.md), [ADR 0004](0004-hash-chained-audit-ledger.md), [ADR 0006](0006-mcp-as-the-primary-agent-interface.md)
 

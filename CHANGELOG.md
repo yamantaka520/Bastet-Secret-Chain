@@ -160,6 +160,15 @@ release exists. Until then every change lands under `Unreleased`.
   path only. New contract codes `use_not_configured`, `use_not_allowed`,
   `upstream_failed`.
 
+- **M6 step 3 — Telegram approval channel**: `bsc serve
+  --telegram-token-credential|--telegram-token-file … --telegram-chat <id>
+  [--telegram-user <id>]…`. Outbound only: `sendMessage` with ✅/⛔ inline
+  buttons at ladder step 3, `getUpdates` long-poll for presses; bound to one
+  chat and optional user ids; 🏠 local-approval-only items get no buttons and
+  refuse remote decisions; ledger `approval_notified` and decisions as
+  `external:telegram:<user id>`. New `Actor::External` in the store and a
+  `ChannelNotifier` that feeds an async channel without blocking the ticker.
+
 ### Status
 
 - M5 gate met on 2026-09-04 with Codex CLI and then Claude Code; Agy and

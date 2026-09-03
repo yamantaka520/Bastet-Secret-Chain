@@ -293,7 +293,12 @@ impl AppState {
             Ok(steps) => {
                 for (id, step) in steps {
                     if let Ok(a) = v.approval(&id) {
-                        let item_name = v.detail(&a.item_id).ok().map(|d| d.name);
+                        let detail = v.detail(&a.item_id).ok();
+                        let item_name = detail.as_ref().map(|d| d.name.clone());
+                        let local_only = detail
+                            .as_ref()
+                            .map(|d| d.meta.local_approval_only)
+                            .unwrap_or(true);
                         let token_label = v.token(&a.token_id).ok().and_then(|t| t.label);
                         self.notifier.notify(&Escalation {
                             approval_id: a.id,
@@ -304,6 +309,7 @@ impl AppState {
                             expires_at: a.expires_at,
                             item_name,
                             token_label,
+                            local_only,
                         });
                     }
                 }

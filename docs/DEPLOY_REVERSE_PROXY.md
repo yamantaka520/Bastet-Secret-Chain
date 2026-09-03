@@ -98,6 +98,21 @@ clear. The trade is stated in the drop-in: root on the host can now decrypt,
 so the vault is as private as the host. A wrong credential makes the unit
 fail rather than start sealed, so a broken deployment is loud.
 
+### Telegram approval channel (ADR 0005 §4)
+
+`bsc serve --telegram-token-credential telegram-token --telegram-chat <chat id>
+[--telegram-user <id>]…` turns on the outbound channel: at the third ladder
+step (60 s) the daemon sends the pending approval — token label, item name,
+the agent's reason verbatim, the deadline — to that one chat with ✅/⛔
+buttons, and long-polls `getUpdates` for the press. Only that chat's buttons
+are honoured, optionally only from the listed user ids; items flagged
+🏠 local-approval-only are announced without buttons and a forged press is
+refused. The decision is ledgered as `external:telegram:<user id>`, the
+delivery as `approval_notified`. The bot token is a second systemd encrypted
+credential (`LoadCredentialEncrypted=telegram-token:/etc/bsc/telegram.cred`)
+— never on a command line. Not enabled on `sec.bastet.tw` until the operator
+supplies a bot and a chat.
+
 Why a **system** unit rather than `bsc service install`: the latter writes a
 user unit, which on a server would need `loginctl enable-linger` and would
 run as an interactive account. A dedicated `bsc` user with `ProtectSystem=

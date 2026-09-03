@@ -25,6 +25,7 @@ pub mod error;
 mod human;
 pub mod notify;
 pub mod state;
+pub mod telegram;
 mod ui;
 mod use_secret;
 mod util;

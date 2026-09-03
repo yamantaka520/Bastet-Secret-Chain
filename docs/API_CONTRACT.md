@@ -176,12 +176,15 @@ local bucket.
 `vault_created` `unseal` `login` `seal` `item_created` `item_updated`
 `version_added` `secret_read` `search` `token_minted` `token_renewed`
 `token_revoked` `secret_used` `session_opened` `session_closed` `approval_requested`
+`approval_notified`
 `approval_escalated` `approval_decided` `approval_timeout` and, once
 implemented, `handoff_minted` `handoff_used` `exposure_acknowledged`.
 `approval_escalated` carries `step`; the notification itself is the
 daemon's `Notifier`, not a separate ledger action. Each carries `actor`, optional `subject`, `outcome`
 ∈ {`ok`,`denied`,`error`,`timeout`}, and a `meta` JSON object that **never**
-contains a value, a token value, or a passphrase.
+contains a value, a token value, or a passphrase. Actors are `human:<session>`,
+`token:<id>`, `system`, or `external:<channel>:<id>` for a decision taken
+through an approval channel such as Telegram.
 
 ## 3. MCP surface
 

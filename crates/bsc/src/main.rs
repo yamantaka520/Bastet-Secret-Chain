@@ -63,6 +63,22 @@ enum Cmd {
         /// -w`). Opt-in unattended unseal for a workstation LaunchAgent.
         #[arg(long)]
         unseal_keychain: Option<String>,
+        /// Telegram approval channel: systemd credential name holding the bot
+        /// token (`LoadCredentialEncrypted=telegram-token:…`).
+        #[arg(long, conflicts_with = "telegram_token_file")]
+        telegram_token_credential: Option<String>,
+        /// Telegram approval channel: 0600 file holding the bot token.
+        #[arg(long)]
+        telegram_token_file: Option<PathBuf>,
+        /// The one Telegram chat id whose Approve/Deny buttons are honoured.
+        #[arg(long)]
+        telegram_chat: Option<i64>,
+        /// Telegram user ids allowed to decide (repeatable). Empty = anyone in the chat.
+        #[arg(long = "telegram-user")]
+        telegram_users: Vec<i64>,
+        /// Bot API base (tests only).
+        #[arg(long, default_value = "https://api.telegram.org", hide = true)]
+        telegram_api_base: String,
     },
     /// Serve MCP over stdio as a client of a running daemon.
     Mcp {
@@ -180,6 +196,62 @@ fn unattended_unseal(
     Ok(Some(source.to_string()))
 }
 
+thread_local! {
+    static TELEGRAM_TASK: std::cell::RefCell<Option<(std::sync::Arc<bsc_daemon::telegram::Telegram>, tokio::sync::mpsc::UnboundedReceiver<bsc_daemon::notify::Escalation>)>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Build the Telegram channel config from the CLI, or `None` when not asked
+/// for. Token and chat must come together; a token source that cannot be
+/// read is an error, not a silent fallback.
+fn telegram_config(
+    credential: Option<&str>,
+    file: Option<&std::path::Path>,
+    chat: Option<i64>,
+    users: &[i64],
+    api_base: &str,
+) -> Result<Option<bsc_daemon::telegram::TelegramConfig>, String> {
+    let token: Zeroizing<String> = match (credential, file) {
+        (None, None) => {
+            if chat.is_some() {
+                return Err(
+                    "--telegram-chat needs --telegram-token-credential or --telegram-token-file"
+                        .into(),
+                );
+            }
+            return Ok(None);
+        }
+        (Some(name), None) => {
+            let dir = std::env::var_os("CREDENTIALS_DIRECTORY")
+                .ok_or("--telegram-token-credential given but CREDENTIALS_DIRECTORY is not set")?;
+            let bytes = std::fs::read(PathBuf::from(dir).join(name))
+                .map_err(|e| format!("telegram credential {name}: {e}"))?;
+            Zeroizing::new(
+                String::from_utf8(trim_newline(bytes))
+                    .map_err(|_| "telegram token is not UTF-8")?,
+            )
+        }
+        (None, Some(p)) => {
+            let bytes = std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?;
+            Zeroizing::new(
+                String::from_utf8(trim_newline(bytes))
+                    .map_err(|_| "telegram token is not UTF-8")?,
+            )
+        }
+        (Some(_), Some(_)) => unreachable!("clap conflicts_with"),
+    };
+    let chat_id = chat.ok_or("telegram token given but --telegram-chat is missing")?;
+    if token.is_empty() || !token.contains(':') {
+        return Err("telegram token does not look like a bot token".into());
+    }
+    Ok(Some(bsc_daemon::telegram::TelegramConfig {
+        api_base: api_base.to_string(),
+        token: std::sync::Arc::new(token),
+        chat_id,
+        allowed_users: users.to_vec(),
+        external_step: 3,
+    }))
+}
+
 fn trim_newline(mut b: Vec<u8>) -> Vec<u8> {
     while matches!(b.last(), Some(b'\n' | b'\r')) {
         b.pop();
@@ -266,6 +338,11 @@ fn run() -> Result<(), String> {
             public_origin,
             unseal_credential,
             unseal_keychain,
+            telegram_token_credential,
+            telegram_token_file,
+            telegram_chat,
+            telegram_users,
+            telegram_api_base,
         } => {
             let mut v = Vault::open(&vault).map_err(|e| format!("{}: {e}", vault.display()))?;
             let unattended = unattended_unseal(
@@ -289,15 +366,46 @@ fn run() -> Result<(), String> {
                 .clone()
                 .map(|o| format!("{}/", o.trim_end_matches('/')))
                 .unwrap_or_else(|| format!("http://{bind}/"));
-            let notifier = std::sync::Arc::new(bsc_daemon::notify::OsNotifier { ui_url });
+            let os_notifier: std::sync::Arc<dyn bsc_daemon::notify::Notifier> =
+                std::sync::Arc::new(bsc_daemon::notify::OsNotifier { ui_url });
+            let telegram = telegram_config(
+                telegram_token_credential.as_deref(),
+                telegram_token_file.as_deref(),
+                telegram_chat,
+                &telegram_users,
+                &telegram_api_base,
+            )?;
+            let (notifier, telegram_rx): (
+                std::sync::Arc<dyn bsc_daemon::notify::Notifier>,
+                Option<_>,
+            ) = if telegram.is_some() {
+                let (n, rx) = bsc_daemon::notify::ChannelNotifier::new(os_notifier);
+                (n, Some(rx))
+            } else {
+                (os_notifier, None)
+            };
             let config = bsc_daemon::Config {
                 public_origin: public_origin.map(|o| o.trim_end_matches('/').to_string()),
                 unattended_unseal: unattended,
                 ..bsc_daemon::Config::default()
             };
             let state = bsc_daemon::AppState::new_with_notifier(v, config, notifier);
+            if let (Some(cfg), Some(rx)) = (telegram, telegram_rx) {
+                tracing::warn!(
+                    chat_id = cfg.chat_id,
+                    "telegram approval channel enabled (outbound only)"
+                );
+                let tg =
+                    std::sync::Arc::new(bsc_daemon::telegram::Telegram::new(cfg, state.clone()));
+                let rt_handle_tg = tg.clone();
+                // Spawned inside the runtime below.
+                TELEGRAM_TASK.with(|c| *c.borrow_mut() = Some((rt_handle_tg, rx)));
+            }
             let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
             rt.block_on(async move {
+                if let Some((tg, rx)) = TELEGRAM_TASK.with(|c| c.borrow_mut().take()) {
+                    tokio::spawn(tg.run(rx));
+                }
                 let shutdown = async {
                     let _ = tokio::signal::ctrl_c().await;
                     tracing::info!("shutting down");

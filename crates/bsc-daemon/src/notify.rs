@@ -2,6 +2,8 @@
 //! and external channels in M6 (ADR 0005 §3–4). Whatever the sink, the event
 //! never carries secret material — only ids, labels, and the agent's reason.
 
+use std::sync::Arc;
+
 /// One escalation step becoming due.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Escalation {
@@ -21,6 +23,9 @@ pub struct Escalation {
     pub item_name: Option<String>,
     /// Token label, when available.
     pub token_label: Option<String>,
+    /// The item may only be approved from the local UI; external channels may
+    /// notify but must not offer approve/deny (ADR 0005 §4).
+    pub local_only: bool,
 }
 
 /// A notification sink.
@@ -135,6 +140,34 @@ impl Notifier for OsNotifier {
                 tracing::debug!(error = %err, "desktop notification tool unavailable");
             }
         }
+    }
+}
+
+/// Forwards escalations into an async channel so an outbound integration
+/// (Telegram, …) can deliver them without blocking the ticker.
+pub struct ChannelNotifier {
+    inner: Arc<dyn Notifier>,
+    tx: tokio::sync::mpsc::UnboundedSender<Escalation>,
+}
+
+impl ChannelNotifier {
+    /// Wrap `inner` (which still runs, e.g. the desktop notifier) and also
+    /// send every escalation to the returned receiver.
+    pub fn new(
+        inner: Arc<dyn Notifier>,
+    ) -> (
+        Arc<ChannelNotifier>,
+        tokio::sync::mpsc::UnboundedReceiver<Escalation>,
+    ) {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        (Arc::new(ChannelNotifier { inner, tx }), rx)
+    }
+}
+
+impl Notifier for ChannelNotifier {
+    fn notify(&self, e: &Escalation) {
+        self.inner.notify(e);
+        let _ = self.tx.send(e.clone());
     }
 }
 

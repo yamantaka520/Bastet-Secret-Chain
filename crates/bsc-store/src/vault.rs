@@ -37,6 +37,14 @@ pub enum Actor {
     },
     /// The daemon itself.
     System,
+    /// A human acting through an external approval channel (ADR 0005 §4),
+    /// e.g. `telegram` with the messaging user's id.
+    External {
+        /// Channel name.
+        channel: String,
+        /// Identity on that channel (never a token or a secret).
+        id: String,
+    },
 }
 
 impl Actor {
@@ -45,6 +53,7 @@ impl Actor {
             Actor::Human { session } => format!("human:{session}"),
             Actor::Token { id } => format!("token:{id}"),
             Actor::System => "system".to_string(),
+            Actor::External { channel, id } => format!("external:{channel}:{id}"),
         }
     }
 }
