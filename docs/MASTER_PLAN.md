@@ -305,3 +305,5 @@ Tracked so they are not silently decided by implementation:
 Project documents and history are mirrored to the BastetMind Obsidian wiki and
 to AgentMemoryOS at the end of any session that changes scope, architecture,
 decisions, deployment state, or verification results. See [`AGENTS.md`](../AGENTS.md).
+
+> **2026-09-04:** first tagged build `v0.1.0` (M0–M6) published as a draft GitHub Release with SHA256SUMS and provenance attestations; production runs `0.1.0+f23d51a`. Signed binaries, dependency refresh and the hardening pass remain M7.

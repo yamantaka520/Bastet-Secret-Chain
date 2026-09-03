@@ -64,10 +64,14 @@ What the tests establish, per step:
 
 ## Production state on `sec.bastet.tw` at the time of writing
 
-- Binary on the host: upgraded on 2026-09-04 to the CI artifact of `91a8875`
-  (sha256 verified against the artifact's `.sha256`; previous binary kept as
-  `/usr/local/bin/bsc.prev`). It now carries ①–⑤. The restart left the vault
-  sealed, as expected without ①'s credential.
+- Binary on the host: `0.1.0+f23d51a`, installed 2026-09-04 from the
+  `v0.1.0` GitHub Release asset (SHA256SUMS and build-provenance attestation
+  verified locally before copying). Earlier that day the host went through
+  `91a8875` → `cc846c0` → `240facc` CI artifacts; each upgrade was preceded by
+  a `sqlite3` backup-API copy of the vault, all of which remain on the host
+  until the operator removes them. `/v1/vault/status`, `bsc --version` and
+  `bsc doctor` now all show the build sha, which is what made the day's
+  three upgrades hard to tell apart before.
 - ① is **active** since 2026-09-04: the operator created
   `/etc/bsc/passphrase.cred` with `systemd-creds encrypt` (the passphrase never
   left their terminal), the drop-in was installed, and two consecutive
