@@ -159,22 +159,18 @@ pub fn run(vault: &Path, url: &str, spec: Option<&Spec>) -> Report {
         ));
     }
 
-    // 4. Daemon reachability and bind.
-    let loopback = url
+    // 4. Daemon reachability and bind. A loopback URL is always fine. A
+    //    public https URL is fine only if the daemon itself reports that origin
+    //    as its acknowledged `public_origin`; anything else is a misconfiguration.
+    let host = url
         .trim_start_matches("http://")
         .trim_start_matches("https://")
         .split('/')
         .next()
-        .map(|h| h.starts_with("127.0.0.1") || h.starts_with("localhost") || h.starts_with("[::1]"))
-        .unwrap_or(false);
-    if loopback {
-        c.push(ok("bind", format!("{url} is loopback")));
-    } else {
-        c.push(fail(
-            "bind",
-            format!("{url} is not loopback; remote exposure is not implemented"),
-        ));
-    }
+        .unwrap_or("");
+    let loopback =
+        host.starts_with("127.0.0.1") || host.starts_with("localhost") || host.starts_with("[::1]");
+    let is_https = url.starts_with("https://");
     let rt = tokio::runtime::Runtime::new().ok();
     let http = reqwest::Client::builder()
         .timeout(Duration::from_secs(3))
@@ -194,7 +190,36 @@ pub fn run(vault: &Path, url: &str, spec: Option<&Spec>) -> Report {
             match status {
                 Some(v) => {
                     let sealed = v["sealed"].as_bool().unwrap_or(true);
-                    c.push(ok("daemon", format!("running v{} · {} · uptime {}s", v["version"].as_str().unwrap_or("?"), if sealed { "sealed" } else { "unsealed" }, v["uptime"])));
+                    c.push(ok(
+                        "daemon",
+                        format!(
+                            "running v{} · {} · uptime {}s",
+                            v["version"].as_str().unwrap_or("?"),
+                            if sealed { "sealed" } else { "unsealed" },
+                            v["uptime"]
+                        ),
+                    ));
+                    let declared = v["public_origin"]
+                        .as_str()
+                        .map(|o| o.trim_end_matches('/').to_string());
+                    if loopback {
+                        c.push(ok(
+                            "bind",
+                            format!(
+                                "{url} is loopback{}",
+                                declared
+                                    .as_deref()
+                                    .map(|o| format!(" (daemon also declares public origin {o})"))
+                                    .unwrap_or_default()
+                            ),
+                        ));
+                    } else if is_https && declared.as_deref() == Some(url.trim_end_matches('/')) {
+                        c.push(ok("bind", format!("{url} is the daemon's acknowledged public origin; TLS terminated by the proxy")));
+                    } else if is_https {
+                        c.push(warn("bind", format!("{url} is https but the daemon declares public_origin {declared:?}; fix --public-origin or the URL")));
+                    } else {
+                        c.push(fail("bind", format!("{url} is neither loopback nor https; a passphrase would cross the network in the clear")));
+                    }
                     let ui = rt.block_on(async {
                         let r = http.get(format!("{url}/")).send().await.ok()?;
                         let csp = r.headers().contains_key("content-security-policy");
@@ -202,13 +227,30 @@ pub fn run(vault: &Path, url: &str, spec: Option<&Spec>) -> Report {
                         Some((csp, body.contains("id=\"root\"")))
                     });
                     match ui {
-                        Some((true, true)) => c.push(ok("web ui", format!("served at {url}/ with CSP"))),
-                        Some((_, false)) => c.push(warn("web ui", "daemon serves a placeholder: the UI was not built into this binary")),
-                        Some((false, true)) => c.push(warn("web ui", "served without a Content-Security-Policy header")),
+                        Some((true, true)) => {
+                            c.push(ok("web ui", format!("served at {url}/ with CSP")))
+                        }
+                        Some((_, false)) => c.push(warn(
+                            "web ui",
+                            "daemon serves a placeholder: the UI was not built into this binary",
+                        )),
+                        Some((false, true)) => c.push(warn(
+                            "web ui",
+                            "served without a Content-Security-Policy header",
+                        )),
                         None => c.push(warn("web ui", "could not fetch /")),
                     }
                 }
-                None => c.push(warn("daemon", format!("not reachable at {url} — start it with `bsc serve` or `bsc service install`"))),
+                None => {
+                    c.push(warn("daemon", format!("not reachable at {url} — start it with `bsc serve` or `bsc service install`")));
+                    if loopback {
+                        c.push(ok("bind", format!("{url} is loopback")));
+                    } else if is_https {
+                        c.push(warn("bind", format!("{url} is a public https URL; cannot confirm the daemon's public_origin while it is unreachable")));
+                    } else {
+                        c.push(fail("bind", format!("{url} is neither loopback nor https")));
+                    }
+                }
             }
         }
         _ => c.push(warn("daemon", "could not build an HTTP client")),

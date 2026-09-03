@@ -163,7 +163,63 @@ fn doctor_detects_a_broken_ledger_and_a_non_loopback_url() {
         s.contains("❌ audit chain") && s.contains("BROKEN at record 1"),
         "{s}"
     );
-    assert!(s.contains("❌ bind") && s.contains("not loopback"), "{s}");
+    assert!(
+        s.contains("❌ bind") && s.contains("neither loopback nor https"),
+        "{s}"
+    );
+}
+
+#[tokio::test]
+async fn doctor_bind_verdict_follows_the_daemons_declared_public_origin() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let vault_path = mkvault(dir.path());
+    let vault = Vault::open(&vault_path).unwrap();
+    let cfg = Config {
+        public_origin: Some("https://sec.example".into()),
+        ..Config::default()
+    };
+    let state = AppState::with(
+        vault,
+        cfg,
+        std::sync::Arc::new(|| 1_800_000_000),
+        std::sync::Arc::new(RecordingNotifier::default()),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app(state)).await.unwrap() });
+    let url = format!("http://{addr}");
+    let home = dir.path().to_path_buf();
+    let vp = vault_path.clone();
+    let out = tokio::task::spawn_blocking(move || {
+        bsc()
+            .args(["doctor", "--url", &url, "--vault"])
+            .arg(&vp)
+            .env("HOME", &home)
+            .output()
+            .unwrap()
+    })
+    .await
+    .unwrap();
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "{s}");
+    assert!(
+        s.contains("✅ bind") && s.contains("also declares public origin https://sec.example"),
+        "{s}"
+    );
+
+    // An unreachable public https URL is a warning, not a failure.
+    let out = bsc()
+        .args(["doctor", "--url", "https://127.0.0.2:1", "--vault"])
+        .arg(&vault_path)
+        .env("HOME", dir.path())
+        .output()
+        .unwrap();
+    let s = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "{s}");
+    assert!(
+        s.contains("⚠️  bind") && s.contains("public https URL"),
+        "{s}"
+    );
 }
 
 #[tokio::test]
