@@ -64,9 +64,10 @@ What the tests establish, per step:
 
 ## Production state on `sec.bastet.tw` at the time of writing
 
-- Binary on the host: the CI artifact of `48eaad0` — has ① but not ②–⑤.
-  Upgrading is a copy and a restart once the current CI run's artifact is
-  downloaded.
+- Binary on the host: upgraded on 2026-09-04 to the CI artifact of `91a8875`
+  (sha256 verified against the artifact's `.sha256`; previous binary kept as
+  `/usr/local/bin/bsc.prev`). It now carries ①–⑤. The restart left the vault
+  sealed, as expected without ①'s credential.
 - ① is **staged, not active**: `/etc/bsc/unattended.conf.staged` and
   `/etc/bsc/` exist; `/etc/bsc/passphrase.cred` does not — it must be created
   by the operator typing the passphrase into `systemd-creds encrypt`. Until
