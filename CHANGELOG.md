@@ -85,8 +85,8 @@ release exists. Until then every change lands under `Unreleased`.
 
 ### Status
 
-- M2 delivered locally on 2026-09-03 with 79 passing tests; CI evidence
-  pending. M3 (Web UI) not started. No release.
+- M2 gate met on 2026-09-03: 79 passing tests locally and on Ubuntu, macOS,
+  and Windows (CI run `33766212364`). M3 (Web UI) not started. No release.
 - M1 gate met on 2026-09-03: 43 passing tests locally and on Ubuntu, macOS,
   and Windows (CI run `33761893191`). M2 has a contract but no code. No
   release.

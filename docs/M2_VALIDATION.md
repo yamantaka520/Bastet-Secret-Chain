@@ -5,7 +5,8 @@
 pending-approval protocol, structured agent errors, hash-chain ledger with a
 verifier, `bsc mcp` server; chain-tamper detection test and an agent-facing
 error-contract test.
-**Status:** gate met locally on 2026-09-03; CI evidence is recorded below.
+**Status:** gate met, 2026-09-03 — local evidence plus three-platform CI on
+commit `852c241`.
 Nothing here is a release, and nothing here is a UI.
 
 ## What was built
@@ -131,4 +132,9 @@ validation.
 
 | Run | Commit | Ubuntu | macOS | Windows | Hygiene |
 | --- | --- | --- | --- | --- | --- |
-| _pending_ | — | — | — | — | — |
+| [`33766212364`](https://github.com/yamantaka520/Bastet-Secret-Chain/actions/runs/33766212364) | `852c241` | ✅ | ✅ | ✅ | ✅ |
+
+Each Rust job ran `cargo fmt --check`, `cargo clippy --all-targets --locked
+-D warnings`, `cargo test --workspace --locked` (79 tests, including the
+socket-level daemon tests and the binary tests), and the known-answer
+regeneration check.
