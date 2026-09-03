@@ -20,6 +20,7 @@
 pub mod access;
 pub mod audit;
 mod error;
+pub mod export;
 pub mod model;
 mod schema;
 mod vault;

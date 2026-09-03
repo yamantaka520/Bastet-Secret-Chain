@@ -257,7 +257,7 @@ recorded in this repository and mirrored to BastetMind.
 | M3 | complete, 2026-09-03 — 82 tests, three-platform CI run `33769473982`; e2e gate met by an API-level substitute plus a recorded manual browser pass | [`M3_VALIDATION.md`](M3_VALIDATION.md) |
 | M4 | delivered 2026-09-04 — 95 tests, CI run `33777806776` with three release artifacts; LaunchAgent install / kill-restart / uninstall observed on a real Mac; **reboot itself not performed on any platform** | [`M4_VALIDATION.md`](M4_VALIDATION.md) |
 | M5 | complete, 2026-09-04 — real Codex CLI and Claude Code runs through `bsc mcp` each crossed a token renewal and a human approval; recipes for Claude Code / Codex / Agy / scripts | [`M5_VALIDATION.md`](M5_VALIDATION.md), [`AGENT_INTEGRATION.md`](AGENT_INTEGRATION.md) |
-| M6 | in progress — ① unattended unseal, ② `use_secret`, ③ Telegram approval channel, ④ pre-authorization grants, rotation cadence, passphrase rotation, item deletion (all 2026-09-04); ⑤ audit-head anchoring and break-glass export pending | — |
+| M6 | complete, 2026-09-04 — ① unattended unseal, ② `use_secret`, ③ Telegram approval channel, ④ pre-authorization, rotation cadence, passphrase rotation, item deletion, ⑤ audit-head anchoring (`bsc audit --anchor-file`) and break-glass export/import (`bsc export` / `bsc import`) | [`M6_VALIDATION.md`](M6_VALIDATION.md) |
 | M7 | not started | — |
 
 ## 7. Open questions
@@ -266,8 +266,13 @@ Tracked so they are not silently decided by implementation:
 
 1. Should the daemon support **multiple vaults** (per-project separation), or
    one vault with strict path scoping? Leaning multiple, deferred to M2.
-2. **Backup format** — encrypted export that a future version can still read,
-   versus raw file copy. Needs a decision before M4 packaging.
+2. ~~Backup format.~~ **Resolved 2026-09-04**: `bsc export` writes a `BSCX1`
+   bundle — JSON of every item and every version, sealed with Argon2id +
+   XChaCha20-Poly1305 under a passphrase that must differ from the vault's,
+   header bound as associated data. `bsc import` recreates items as new
+   `sref`s in another vault. Tokens, sessions, approvals, grants, and the
+   ledger are deliberately not exported. Raw file copy remains a valid
+   *backup*; the bundle is for handing secrets across vaults or successors.
 3. **TOTP** generation inside the vault: convenient, but it turns the vault
    into a second factor holder alongside the first. Deferred to M6.
 4. ~~Whether agent reads should support a use-once wrapper.~~ **Implemented

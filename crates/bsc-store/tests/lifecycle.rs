@@ -328,3 +328,92 @@ fn rotation_cadence_is_stored_and_due_is_derived_from_updated() {
         .unwrap();
     assert_eq!(m.rotation_due_at(), None);
 }
+
+#[test]
+fn export_round_trips_into_a_fresh_vault_under_a_separate_passphrase() {
+    let (_d, mut v, _c) = fx();
+    let a = item(&mut v, "prod/aws", "billing", ItemType::CloudKey, Some(30));
+    v.add_version(&a, b"body-of-billing-v2", Some("rotated"), &human(), "")
+        .unwrap();
+    v.set_item_flags(&a, None, Some(true), None, None, None, &human())
+        .unwrap();
+    v.set_item_use(
+        &a,
+        Some(&bsc_store::model::UseBinding {
+            urls: vec!["https://api.example/*".into()],
+            header: "X: {value}".into(),
+            methods: vec!["POST".into()],
+        }),
+        false,
+        &human(),
+    )
+    .unwrap();
+    let _b = item(&mut v, "staging/web", "admin", ItemType::Login, None);
+
+    let bundle = v.export_all(&human(), "test").unwrap();
+    assert_eq!(bundle.items.len(), 2);
+    let billing = bundle.items.iter().find(|i| i.name == "billing").unwrap();
+    assert_eq!(billing.versions.len(), 2);
+    assert_eq!(billing.versions[1].note.as_deref(), Some("rotated"));
+    assert!(
+        billing.local_approval_only
+            && billing.use_binding.is_some()
+            && billing.rotation_days == Some(30)
+    );
+
+    let params = KdfParams::insecure_for_tests(*b"export-salt-0001");
+    let sealed = bsc_store::export::seal(&bundle, b"export passphrase", &params).unwrap();
+    assert!(
+        !sealed.windows(14).any(|w| w == b"body-of-billing"),
+        "bundle is ciphertext"
+    );
+    assert!(bsc_store::export::open(&sealed, b"wrong").is_err());
+    let mut tampered = sealed.clone();
+    let last = tampered.len() - 1;
+    tampered[last] ^= 1;
+    assert!(bsc_store::export::open(&tampered, b"export passphrase").is_err());
+    let opened = bsc_store::export::open(&sealed, b"export passphrase").unwrap();
+
+    let dir2 = TempDir::new().unwrap();
+    let mut w = Vault::create_with_params(
+        &dir2.path().join("w.bsc"),
+        b"other vault pw",
+        KdfParams::insecure_for_tests(*b"lifecycle-salt-2"),
+    )
+    .unwrap();
+    let ids = w.import_all(&opened, &human(), "restore").unwrap();
+    assert_eq!(ids.len(), 2);
+    assert!(
+        ids.iter()
+            .all(|id| !bundle.items.iter().any(|i| &i.sref == id)),
+        "new srefs"
+    );
+    let nb = w.search("billing", &human()).unwrap();
+    assert_eq!(nb.len(), 1);
+    let d = w.detail(&nb[0]).unwrap();
+    assert_eq!(d.meta.current_version, 2);
+    assert!(d.meta.local_approval_only && d.meta.approval_required);
+    assert_eq!(d.use_binding.unwrap().methods, vec!["POST"]);
+    assert_eq!(
+        &*w.read_version(&nb[0], Some(1), &human(), "").unwrap(),
+        b"body-of-billing"
+    );
+    assert_eq!(
+        &*w.read(&nb[0], &human(), "").unwrap(),
+        b"body-of-billing-v2"
+    );
+    let acts: Vec<String> = w
+        .audit_read(1, 1000)
+        .unwrap()
+        .into_iter()
+        .map(|r| r.action)
+        .collect();
+    assert!(acts.contains(&"vault_imported".to_string()));
+    let src: Vec<String> = v
+        .audit_read(1, 1000)
+        .unwrap()
+        .into_iter()
+        .map(|r| r.action)
+        .collect();
+    assert!(src.contains(&"vault_exported".to_string()));
+}

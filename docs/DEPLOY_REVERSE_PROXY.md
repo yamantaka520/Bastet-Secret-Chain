@@ -158,9 +158,10 @@ it idempotently through the API with a token read from a file:
    the tunnel. *Done* (app `508fe70e-…`).
 
 Client side, on an allow-listed machine with `cloudflared` installed. The
-account for this hostname is the operator's own (`manfred`); `CatWhiskers`
-belongs to a different project on the same host and was only used for the
-setup work:
+operator's standing instruction (2026-09-04): reach this host **only** as
+`ssh ssh.bastet.tw`, with the account (`manfred`, sudo/su) and key supplied by
+the client's own `~/.ssh/config`; the `CatWhiskers` account belongs to a
+different project and was used only for the initial setup:
 
 ```
 Host ssh.bastet.tw

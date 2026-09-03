@@ -181,8 +181,19 @@ release exists. Until then every change lands under `Unreleased`.
   New ledger actions `passphrase_rotated`, `item_deleted`, `grant_issued`,
   `grant_revoked`.
 
+- **M6 step 5 — anchoring and break-glass export**: `bsc audit --anchor-file
+  <path> [--no-anchor]` checks the chain against previously written
+  `{ts, len, head}` anchors (tail truncation → `TAIL TRUNCATED`, rewritten
+  record → `HISTORY REWRITTEN`) and appends a new anchor; `bsc export --out
+  file.bscx` writes every item and version as a `BSCX1` bundle sealed under a
+  separate passphrase (Argon2id + XChaCha20-Poly1305, header bound as AAD,
+  refuses the vault passphrase and refuses to overwrite); `bsc import --in
+  file.bscx` recreates the items as new srefs. Ledger `vault_exported` /
+  `vault_imported`.
+
 ### Status
 
+- M6 complete on 2026-09-04 (five steps); M7 not started. No tag, no release.
 - M5 gate met on 2026-09-04 with Codex CLI and then Claude Code; Agy and
   Grok documented but not run end to end.
 - M4 delivered on 2026-09-04: 95 passing tests and three release artifacts on

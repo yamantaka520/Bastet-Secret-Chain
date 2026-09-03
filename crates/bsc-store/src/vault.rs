@@ -1150,6 +1150,16 @@ impl Vault {
         audit::read(&self.conn, from, limit)
     }
 
+    /// Take an anchor of the current chain head (works while sealed).
+    pub fn audit_anchor(&self) -> Result<audit::Anchor> {
+        audit::anchor_now(&self.conn, self.now())
+    }
+
+    /// Check the chain against anchors kept outside the vault.
+    pub fn audit_check_anchors(&self, anchors: &[audit::Anchor]) -> Result<audit::AnchorStatus> {
+        audit::check_anchors(&self.conn, anchors)
+    }
+
     /// Ledger records about one subject id. Works while sealed.
     pub fn audit_read_subject(
         &self,

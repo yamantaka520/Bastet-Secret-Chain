@@ -16,7 +16,7 @@ mod service;
 
 use std::{net::SocketAddr, path::PathBuf, process::ExitCode};
 
-use bsc_store::{audit::ChainStatus, Vault};
+use bsc_store::{audit::ChainStatus, Actor, Vault};
 use clap::{Parser, Subcommand};
 use zeroize::Zeroizing;
 
@@ -88,10 +88,48 @@ enum Cmd {
         #[arg(long)]
         token_file: Option<PathBuf>,
     },
-    /// Verify the audit chain of a vault file, sealed.
+    /// Verify the audit chain of a vault file, sealed. With --anchor-file, also
+    /// check the chain against every anchor in that file (detects tail
+    /// truncation) and, if consistent, append a fresh anchor.
     Audit {
         #[arg(long, default_value_os_t = default_vault())]
         vault: PathBuf,
+        /// Append-only JSON-lines file of anchors, kept somewhere the vault
+        /// file's owner cannot silently rewrite (another disk, a log shipper,
+        /// a git repo). Default: none.
+        #[arg(long)]
+        anchor_file: Option<PathBuf>,
+        /// Only check anchors; do not append a new one.
+        #[arg(long)]
+        no_anchor: bool,
+    },
+    /// Break-glass export: every item and every version, sealed under a
+    /// separate export passphrase. Prompts for the vault passphrase, then the
+    /// export passphrase twice. With --passphrase-stdin, reads them as lines.
+    Export {
+        #[arg(long, default_value_os_t = default_vault())]
+        vault: PathBuf,
+        /// Output file (created 0600). Never write it next to the vault.
+        #[arg(long)]
+        out: PathBuf,
+        /// Read vault passphrase then export passphrase from stdin (scripts, tests).
+        #[arg(long)]
+        passphrase_stdin: bool,
+        /// Reason recorded in the ledger.
+        #[arg(long, default_value = "break-glass export")]
+        reason: String,
+    },
+    /// Import a bundle made by `export` into this vault as new items.
+    Import {
+        #[arg(long, default_value_os_t = default_vault())]
+        vault: PathBuf,
+        #[arg(long = "in", value_name = "FILE")]
+        input: PathBuf,
+        /// Read vault passphrase then export passphrase from stdin.
+        #[arg(long)]
+        passphrase_stdin: bool,
+        #[arg(long, default_value = "restore from export")]
+        reason: String,
     },
     /// Start the daemon at login through launchd, systemd --user, or Task Scheduler.
     Service {
@@ -250,6 +288,75 @@ fn telegram_config(
         allowed_users: users.to_vec(),
         external_step: 3,
     }))
+}
+
+fn read_anchors(path: &std::path::Path) -> Result<Vec<bsc_store::audit::Anchor>, String> {
+    let text = match std::fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+    };
+    text.lines()
+        .filter(|l| !l.trim().is_empty())
+        .enumerate()
+        .map(|(i, l)| {
+            serde_json::from_str(l).map_err(|e| format!("{} line {}: {e}", path.display(), i + 1))
+        })
+        .collect()
+}
+
+fn append_anchor(path: &std::path::Path, a: &bsc_store::audit::Anchor) -> Result<(), String> {
+    use std::io::Write;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+    }
+    writeln!(
+        f,
+        "{}",
+        serde_json::to_string(a).map_err(|e| e.to_string())?
+    )
+    .map_err(|e| e.to_string())
+}
+
+/// Two passphrases, from stdin lines (scripts/tests) or interactive prompts.
+fn two_passphrases(
+    from_stdin: bool,
+    first: &str,
+    second: &str,
+) -> Result<(Zeroizing<String>, Zeroizing<String>), String> {
+    if from_stdin {
+        let mut a = String::new();
+        let mut b = String::new();
+        std::io::stdin()
+            .read_line(&mut a)
+            .map_err(|e| e.to_string())?;
+        std::io::stdin()
+            .read_line(&mut b)
+            .map_err(|e| e.to_string())?;
+        let a = Zeroizing::new(a.trim_end_matches(['\r', '\n']).to_string());
+        let b = Zeroizing::new(b.trim_end_matches(['\r', '\n']).to_string());
+        if a.is_empty() || b.is_empty() {
+            return Err("two non-empty passphrase lines are required on stdin".into());
+        }
+        return Ok((a, b));
+    }
+    let a = Zeroizing::new(rpassword::prompt_password(first).map_err(|e| e.to_string())?);
+    let b = Zeroizing::new(rpassword::prompt_password(second).map_err(|e| e.to_string())?);
+    let b2 = Zeroizing::new(rpassword::prompt_password("Again: ").map_err(|e| e.to_string())?);
+    if *b != *b2 {
+        return Err("export passphrases do not match".into());
+    }
+    Ok((a, b))
 }
 
 fn trim_newline(mut b: Vec<u8>) -> Vec<u8> {
@@ -433,6 +540,92 @@ fn run() -> Result<(), String> {
             rt.block_on(bsc_mcp::McpServer::new(url, token.as_str()).run_stdio())
                 .map_err(|e| e.to_string())
         }
+        Cmd::Export {
+            vault,
+            out,
+            passphrase_stdin,
+            reason,
+        } => {
+            let mut v = Vault::open(&vault).map_err(|e| format!("{}: {e}", vault.display()))?;
+            let (vault_pw, export_pw) = two_passphrases(
+                passphrase_stdin,
+                "Vault passphrase: ",
+                "Export passphrase (different from the vault's): ",
+            )?;
+            if vault_pw == export_pw {
+                return Err("the export passphrase must differ from the vault passphrase".into());
+            }
+            v.unseal(
+                vault_pw.as_bytes(),
+                &Actor::Human {
+                    session: "cli-export".into(),
+                },
+            )
+            .map_err(|e| e.to_string())?;
+            let actor = Actor::Human {
+                session: "cli-export".into(),
+            };
+            let bundle = v.export_all(&actor, &reason).map_err(|e| e.to_string())?;
+            let params = bsc_crypto::kdf::KdfParams::recommended_like(v.kdf_params())
+                .map_err(|e| e.to_string())?;
+            let bytes = bsc_store::export::seal(&bundle, export_pw.as_bytes(), &params)
+                .map_err(|e| e.to_string())?;
+            if out.exists() {
+                return Err(format!("{} exists; refusing to overwrite", out.display()));
+            }
+            std::fs::write(&out, &bytes).map_err(|e| format!("{}: {e}", out.display()))?;
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&out, std::fs::Permissions::from_mode(0o600));
+            }
+            eprintln!(
+                "exported {} items ({} bytes) to {} — sealed under the export passphrase; keep them apart",
+                bundle.items.len(),
+                bytes.len(),
+                out.display()
+            );
+            Ok(())
+        }
+        Cmd::Import {
+            vault,
+            input,
+            passphrase_stdin,
+            reason,
+        } => {
+            let mut v = Vault::open(&vault).map_err(|e| format!("{}: {e}", vault.display()))?;
+            let (vault_pw, export_pw) = two_passphrases(
+                passphrase_stdin,
+                "Vault passphrase: ",
+                "Export passphrase: ",
+            )?;
+            v.unseal(
+                vault_pw.as_bytes(),
+                &Actor::Human {
+                    session: "cli-import".into(),
+                },
+            )
+            .map_err(|e| e.to_string())?;
+            let bytes = std::fs::read(&input).map_err(|e| format!("{}: {e}", input.display()))?;
+            let bundle = bsc_store::export::open(&bytes, export_pw.as_bytes())
+                .map_err(|e| format!("cannot open bundle: {e}"))?;
+            let actor = Actor::Human {
+                session: "cli-import".into(),
+            };
+            let ids = v
+                .import_all(&bundle, &actor, &reason)
+                .map_err(|e| e.to_string())?;
+            eprintln!(
+                "imported {} items (exported {} from chain head {}…)",
+                ids.len(),
+                bundle.exported_at,
+                &bundle.source_head[..12.min(bundle.source_head.len())]
+            );
+            for id in ids {
+                println!("{id}");
+            }
+            Ok(())
+        }
         Cmd::Service { action } => match action {
             ServiceCmd::Install {
                 vault,
@@ -468,15 +661,51 @@ fn run() -> Result<(), String> {
                 _ => Ok(()),
             }
         }
-        Cmd::Audit { vault } => {
+        Cmd::Audit {
+            vault,
+            anchor_file,
+            no_anchor,
+        } => {
             let v = Vault::open(&vault).map_err(|e| format!("{}: {e}", vault.display()))?;
-            match v.audit_verify().map_err(|e| e.to_string())? {
-                ChainStatus::Intact { len, head } => {
-                    println!("intact: {len} records, head {}", hex::encode(head));
-                    Ok(())
+            let (len, head) = match v.audit_verify().map_err(|e| e.to_string())? {
+                ChainStatus::Intact { len, head } => (len, head),
+                ChainStatus::Broken { at } => {
+                    return Err(format!("audit chain broken at record {at}"))
                 }
-                ChainStatus::Broken { at } => Err(format!("audit chain broken at record {at}")),
+            };
+            println!("intact: {len} records, head {}", hex::encode(head));
+            if let Some(path) = anchor_file {
+                let anchors = read_anchors(&path)?;
+                match v.audit_check_anchors(&anchors).map_err(|e| e.to_string())? {
+                    bsc_store::audit::AnchorStatus::Consistent { anchors: n } => {
+                        println!("anchors: {n} checked, consistent");
+                    }
+                    bsc_store::audit::AnchorStatus::Truncated {
+                        anchored_len,
+                        actual_len,
+                    } => {
+                        return Err(format!(
+                            "TAIL TRUNCATED: an anchor recorded {anchored_len} records, the chain now has {actual_len}"
+                        ));
+                    }
+                    bsc_store::audit::AnchorStatus::Diverged { at } => {
+                        return Err(format!(
+                            "HISTORY REWRITTEN: record {at} no longer matches its anchor"
+                        ));
+                    }
+                }
+                if !no_anchor {
+                    let a = v.audit_anchor().map_err(|e| e.to_string())?;
+                    append_anchor(&path, &a)?;
+                    println!(
+                        "anchored: len {} head {}… → {}",
+                        a.len,
+                        &a.head[..12],
+                        path.display()
+                    );
+                }
             }
+            Ok(())
         }
     }
 }

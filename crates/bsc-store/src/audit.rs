@@ -189,6 +189,78 @@ pub fn verify(conn: &Connection) -> Result<ChainStatus> {
     })
 }
 
+/// A statement, kept *outside* the vault file, that the chain had `len`
+/// records and head `head` at time `ts`. Truncating the tail below an
+/// anchored length, or rewriting history under one, becomes detectable.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Anchor {
+    /// Unix seconds when the anchor was taken.
+    pub ts: i64,
+    /// Chain length at that moment.
+    pub len: u64,
+    /// Hex SHA-256 of record `len`.
+    pub head: String,
+}
+
+/// Result of checking the chain against anchors.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AnchorStatus {
+    /// Every anchor's record exists with the anchored hash.
+    Consistent {
+        /// Anchors checked.
+        anchors: usize,
+    },
+    /// The chain is shorter than an anchor says it was: the tail was cut.
+    Truncated {
+        /// Length the anchor recorded.
+        anchored_len: u64,
+        /// Length now.
+        actual_len: u64,
+    },
+    /// Record `len` exists but its hash differs from the anchored one.
+    Diverged {
+        /// The anchored length.
+        at: u64,
+    },
+}
+
+/// Take an anchor of the current head.
+pub fn anchor_now(conn: &Connection, ts: i64) -> Result<Anchor> {
+    let (len, head) = head(conn)?;
+    Ok(Anchor {
+        ts,
+        len,
+        head: hex::encode(head),
+    })
+}
+
+/// Compare the chain with previously taken anchors. Runs after [`verify`];
+/// it does not itself recompute hashes.
+pub fn check_anchors(conn: &Connection, anchors: &[Anchor]) -> Result<AnchorStatus> {
+    let (len_now, _) = head(conn)?;
+    for a in anchors {
+        if a.len == 0 {
+            continue;
+        }
+        if len_now < a.len {
+            return Ok(AnchorStatus::Truncated {
+                anchored_len: a.len,
+                actual_len: len_now,
+            });
+        }
+        let stored: Option<Vec<u8>> = conn
+            .query_row("SELECT hash FROM audit WHERE n = ?1", [a.len], |r| r.get(0))
+            .optional()?;
+        match stored {
+            Some(ref h) if hex::encode(h) == a.head => {}
+            _ => return Ok(AnchorStatus::Diverged { at: a.len }),
+        }
+    }
+    Ok(AnchorStatus::Consistent {
+        anchors: anchors.len(),
+    })
+}
+
 /// Read records in `[from, from+limit)` for display.
 pub fn read(conn: &Connection, from: u64, limit: u64) -> Result<Vec<AuditRecord>> {
     read_where(conn, "n >= ?1", params![from, limit], from, limit)

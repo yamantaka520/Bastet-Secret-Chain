@@ -22,6 +22,7 @@
 #![warn(missing_docs)]
 
 pub mod blind_index;
+pub mod bundle;
 pub mod envelope;
 mod error;
 pub mod kdf;

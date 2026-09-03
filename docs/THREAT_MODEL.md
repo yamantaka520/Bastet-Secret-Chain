@@ -116,9 +116,14 @@ the operator's browser session or a token file inherits that authority.
 
 Each audit record commits to the hash of its predecessor; `bsc audit verify`
 recomputes the chain. Deleting or editing a record breaks the chain and is
-detectable. **Residual:** truncation of the tail is detectable only if the head
-hash is anchored elsewhere — periodic anchoring (printed, or written to a
-separate append-only store) is deferred to M6.
+detectable. Tail truncation is caught by **anchors**: `bsc audit --anchor-file
+<path>` compares the chain with every `{ts, len, head}` line previously
+written there and appends a fresh one; a chain shorter than an anchor, or
+whose record `len` no longer carries the anchored hash, fails loudly. The
+anchor file must live somewhere the vault file's owner cannot silently
+rewrite (another disk, a log shipper, a git repo). **Residual:** an attacker
+who controls both the vault and the anchor store can still truncate; and
+truncation between two anchor runs is invisible until the next run.
 
 ### A7 — Network exposure mistakes
 
