@@ -6,6 +6,16 @@ release exists. Until then every change lands under `Unreleased`.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-04
+
+First tagged build. Everything from M0 to M6 is in it; see
+`docs/MASTER_PLAN.md` for what each milestone proved and
+`docs/M6_VALIDATION.md` for the production state. Not a security release:
+no external audit, no signed binaries yet (M7).
+
+- **Added: build identity.** `/v1/vault/status`, `bsc --version` and
+  `bsc doctor` report `<version>+<git sha>` and the build date, so an operator
+  can tell which build a host runs.
 - **Fixed: scope spelling.** A token or session path scope written as
   `test/*` or `test/` now means the same as `test` (the subtree). Previously
   the `*` was matched literally and such a token saw nothing.
@@ -219,3 +229,6 @@ release exists. Until then every change lands under `Unreleased`.
 - M1 gate met on 2026-09-03: 43 passing tests locally and on Ubuntu, macOS,
   and Windows (CI run `33761893191`). M2 has a contract but no code. No
   release.
+
+[Unreleased]: https://github.com/yamantaka520/Bastet-Secret-Chain/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/yamantaka520/Bastet-Secret-Chain/releases/tag/v0.1.0

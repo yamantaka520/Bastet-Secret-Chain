@@ -235,7 +235,7 @@ dependencies = [
 
 [[package]]
 name = "bsc"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "axum",
  "bsc-crypto",
@@ -257,7 +257,7 @@ dependencies = [
 
 [[package]]
 name = "bsc-crypto"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "argon2",
  "chacha20poly1305",
@@ -274,7 +274,7 @@ dependencies = [
 
 [[package]]
 name = "bsc-daemon"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "axum",
  "base64",
@@ -297,7 +297,7 @@ dependencies = [
 
 [[package]]
 name = "bsc-mcp"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "axum",
  "bsc-crypto",
@@ -314,7 +314,7 @@ dependencies = [
 
 [[package]]
 name = "bsc-store"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "base64",
  "bsc-crypto",

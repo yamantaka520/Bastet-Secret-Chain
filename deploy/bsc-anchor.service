@@ -1,0 +1,24 @@
+# Daily audit-chain anchor for a systemd-managed bsc daemon.
+#
+# Verifies the ledger and appends {ts, len, head} to an anchor file that the
+# vault's owner (User=bsc) cannot write: the file lives under a root-only
+# directory. A later truncation or rewrite of the ledger is then detectable
+# by `bsc audit --anchor-file`, which the timer runs every day.
+#
+# Install:  sudo install -m 0644 deploy/bsc-anchor.{service,timer} /etc/systemd/system/
+#           sudo install -d -m 0700 /var/lib/bsc-anchors
+#           sudo systemctl daemon-reload && sudo systemctl enable --now bsc-anchor.timer
+# Check:    systemctl list-timers bsc-anchor.timer ; journalctl -u bsc-anchor
+[Unit]
+Description=Bastet Secret Chain audit-chain anchor
+After=bsc.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/bsc audit --vault /var/lib/bsc/vault.bsc --anchor-file /var/lib/bsc-anchors/anchors.jsonl
+# Root, so the anchor directory stays out of the bsc user's reach.
+UMask=0077
+ProtectSystem=strict
+ReadWritePaths=/var/lib/bsc-anchors /var/lib/bsc
+PrivateTmp=yes
+NoNewPrivileges=yes

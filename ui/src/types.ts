@@ -51,7 +51,7 @@ export interface AuditRecord {
 }
 
 export interface Status {
-  sealed: boolean; version: string; uptime: number;
+  sealed: boolean; version: string; build?: { sha: string; date: string }; uptime: number;
   items?: number; pending_approvals?: number; active_sessions?: number; live_tokens?: number;
   chain?: { intact: boolean; len?: number; head?: string; broken_at?: number };
   kdf?: { m_cost_kib: number; t_cost: number; p_cost: number };

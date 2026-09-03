@@ -83,9 +83,11 @@ What the tests establish, per step:
   token the operator had pasted into the assistant chat earlier was treated as
   burned and revoked via @BotFather before setup. End-to-end approval through
   the real Bot API: see below.
-- No anchor timer runs on the host yet; `bsc audit --anchor-file` is a manual
-  command. A systemd timer writing to a location outside `/var/lib/bsc` is
-  the obvious next step.
+- Anchoring runs daily since 2026-09-04: `bsc-anchor.timer` →
+  `bsc audit --anchor-file /var/lib/bsc-anchors/anchors.jsonl` as root, the
+  directory 0700 root so the `bsc` user cannot touch it. First anchor at
+  ledger length 45; a second run reported consistent; the `bsc` user is
+  refused on the directory.
 
 ## Not done — explicitly
 
@@ -95,7 +97,7 @@ What the tests establish, per step:
 - `bsc exec` was rejected on purpose: a child process the agent controls can
   print its environment.
 - Windows DPAPI / Linux Secret Service unseal; macOS keychain path untested.
-- No anchor scheduling; no automatic export scheduling.
+- No automatic export scheduling (anchoring is scheduled).
 - The `use_secret` SSRF guard resolves the host twice (guard, then client): a
   DNS-rebinding window remains and is recorded in the threat model.
 - Approval fatigue defaults (ADR 0005 §6) are still chosen, not measured.

@@ -37,7 +37,7 @@ export default function Dashboard({ t, status }: { t: (k: Key, v?: Record<string
       </div>
       <div className="card">
         <div className="kv">
-          <dt>version</dt><dd className="mono">{status?.version}</dd>
+          <dt>version</dt><dd className="mono">{status?.version}{status?.build?.date ? ` (${status.build.date})` : ""}</dd>
           <dt>uptime</dt><dd>{status?.uptime}s</dd>
           <dt>KDF</dt><dd className="mono">{status?.kdf ? `Argon2id ${status.kdf.m_cost_kib / 1024} MiB · t=${status.kdf.t_cost} · p=${status.kdf.p_cost}` : "—"}</dd>
           <dt>{t("head")}</dt><dd className="mono small" style={{ wordBreak: "break-all" }}>{chain?.head ?? "—"}</dd>

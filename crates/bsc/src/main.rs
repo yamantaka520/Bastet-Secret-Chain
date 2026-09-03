@@ -21,7 +21,7 @@ use clap::{Parser, Subcommand};
 use zeroize::Zeroizing;
 
 #[derive(Parser)]
-#[command(name = "bsc", version, about = "Bastet Secret Chain")]
+#[command(name = "bsc", version = bsc_daemon::VERSION, about = "Bastet Secret Chain")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,

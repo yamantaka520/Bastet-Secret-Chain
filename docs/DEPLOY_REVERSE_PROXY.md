@@ -236,3 +236,14 @@ IPv6 connectivity on the client, not anything on the server. A plain HTTPS
   from `172.216.48.153` or `59.124.17.34`.
 - The Cloudflare API token used for the setup should now be revoked or
   narrowed by the operator; it was read from a file and never printed.
+
+## Daily ledger anchor
+
+`deploy/bsc-anchor.service` + `deploy/bsc-anchor.timer` run
+`bsc audit --anchor-file /var/lib/bsc-anchors/anchors.jsonl` once a day as
+root. The anchor directory is root-only, so the `bsc` service user — the only
+identity that can write the vault — cannot rewrite the anchors to match a
+truncated ledger. Install with the commands in the unit's header; check with
+`systemctl list-timers bsc-anchor.timer` and `journalctl -u bsc-anchor`. An
+inconsistent anchor makes the unit fail, which shows up in `systemctl
+--failed`; wire that to whatever already watches the host.

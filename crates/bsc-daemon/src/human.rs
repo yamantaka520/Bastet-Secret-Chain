@@ -275,7 +275,8 @@ pub async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> R
     let v = state.vault();
     let mut out = json!({
         "sealed": v.is_sealed(),
-        "version": env!("CARGO_PKG_VERSION"),
+        "version": crate::VERSION,
+        "build": { "sha": crate::BUILD_SHA, "date": crate::BUILD_DATE },
         "uptime": state.uptime(),
         "public_origin": state.config.public_origin,
         "unattended_unseal": state.config.unattended_unseal,

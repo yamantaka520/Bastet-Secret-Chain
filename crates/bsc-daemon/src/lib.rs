@@ -39,6 +39,15 @@ use axum::{
 
 pub use state::{AppState, Config};
 
+/// Package version plus the short git sha it was built from, e.g.
+/// `0.1.0+240facc`. This is what `/v1/vault/status`, `bsc --version` and
+/// `bsc doctor` show, so an operator can tell which build a host runs.
+pub const VERSION: &str = concat!(env!("CARGO_PKG_VERSION"), "+", env!("BSC_BUILD_SHA"));
+/// Short git sha of the build (`unknown` outside a checkout and CI).
+pub const BUILD_SHA: &str = env!("BSC_BUILD_SHA");
+/// UTC date of the build, `YYYY-MM-DD`.
+pub const BUILD_DATE: &str = env!("BSC_BUILD_DATE");
+
 /// Build the router. Separated from [`serve`] so tests can bind their own port.
 pub fn app(state: Arc<AppState>) -> Router {
     Router::new()

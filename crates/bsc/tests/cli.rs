@@ -362,3 +362,21 @@ fn export_and_import_through_the_binary() {
         b"the-value"
     );
 }
+
+#[test]
+fn version_carries_the_build_sha() {
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_bsc"))
+        .arg("--version")
+        .output()
+        .unwrap();
+    let text = String::from_utf8(out.stdout).unwrap();
+    // "bsc 0.1.0+240facc" — package version, a plus, then a 7-char sha (or
+    // "unknown" outside a checkout).
+    let v = text.trim().strip_prefix("bsc ").unwrap_or(text.trim());
+    let (pkg, sha) = v.split_once('+').expect("version has +sha");
+    assert_eq!(pkg, env!("CARGO_PKG_VERSION"));
+    assert!(
+        sha == "unknown" || (sha.len() == 7 && sha.chars().all(|c| c.is_ascii_hexdigit())),
+        "{sha}"
+    );
+}
