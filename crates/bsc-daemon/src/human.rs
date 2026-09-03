@@ -107,11 +107,15 @@ pub async fn unseal(
     headers: HeaderMap,
     b: Result<Json<Unseal>, JsonRejection>,
 ) -> Res {
-    auth::same_origin(&headers, true)?;
+    auth::same_origin(&state, &headers, true)?;
+    let client = auth::client_addr(&state, &headers);
+    if !state.login_allowed(&client) {
+        return Err(ApiError::rate_limited(600));
+    }
     let Unseal { passphrase } = body(b)?;
     let pw = Zeroizing::new(passphrase);
     let st = state.clone();
-    tokio::task::spawn_blocking(move || -> Result<(), ApiError> {
+    let outcome = tokio::task::spawn_blocking(move || -> Result<(), ApiError> {
         let mut v = st.vault();
         // No session exists yet, so the actor is the system.
         if v.is_sealed() {
@@ -122,7 +126,13 @@ pub async fn unseal(
         Ok(())
     })
     .await
-    .map_err(ApiError::internal)??;
+    .map_err(ApiError::internal)?;
+    if let Err(e) = outcome {
+        if e.code == "bad_passphrase" {
+            state.login_failed(&client);
+        }
+        return Err(e);
+    }
     let id = state.open_human_session();
     let mut resp = (
         StatusCode::OK,
@@ -130,7 +140,7 @@ pub async fn unseal(
     )
         .into_response();
     resp.headers_mut()
-        .insert(header::SET_COOKIE, auth::set_cookie(&id));
+        .insert(header::SET_COOKIE, auth::set_cookie(&state, &id));
     Ok(resp)
 }
 
@@ -149,6 +159,7 @@ pub async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> R
         "sealed": v.is_sealed(),
         "version": env!("CARGO_PKG_VERSION"),
         "uptime": state.uptime(),
+        "public_origin": state.config.public_origin,
     });
     if auth::human(&state, &headers, false).is_ok() {
         let chain = match v.audit_verify()? {

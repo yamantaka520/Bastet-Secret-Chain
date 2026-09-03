@@ -36,6 +36,17 @@ pub struct Config {
     pub default_session_duration: i64,
     /// Seconds an agent should wait between approval polls.
     pub poll_interval: u64,
+    /// The one external origin (scheme + host[:port]) a reverse proxy in front
+    /// of this daemon presents to browsers, e.g. `https://sec.example`. When
+    /// set: that Origin is accepted on the human surface, the session cookie is
+    /// `Secure` if the scheme is https, `X-Forwarded-For` from the loopback
+    /// proxy is used as the client address for rate limiting, and an
+    /// `exposure_acknowledged` record is written to the ledger at startup.
+    /// `None` keeps the loopback-only posture (master plan §4.4).
+    pub public_origin: Option<String>,
+    /// Failed unseal/login attempts allowed per client address per 10 minutes
+    /// before further attempts are refused for the rest of the window.
+    pub login_attempts_per_10m: u32,
 }
 
 impl Default for Config {
@@ -52,6 +63,8 @@ impl Default for Config {
             default_rate_limit: 60,
             default_session_duration: 30 * 60,
             poll_interval: 5,
+            public_origin: None,
+            login_attempts_per_10m: 5,
         }
     }
 }
@@ -69,6 +82,7 @@ pub struct AppState {
     vault: Mutex<Vault>,
     human: Mutex<HashMap<String, HumanSession>>,
     rate: Mutex<HashMap<String, (i64, u32)>>,
+    login_failures: Mutex<HashMap<String, (i64, u32)>>,
     /// Tunables.
     pub config: Config,
     clock: Clock,
@@ -116,6 +130,7 @@ impl AppState {
             vault: Mutex::new(vault),
             human: Mutex::new(HashMap::new()),
             rate: Mutex::new(HashMap::new()),
+            login_failures: Mutex::new(HashMap::new()),
             config,
             clock,
             notifier,
@@ -199,6 +214,57 @@ impl AppState {
         }
         e.1 += 1;
         Ok(())
+    }
+
+    // ----------------------------------------------------- login throttle
+
+    /// Whether this client may attempt an unseal/login right now.
+    pub fn login_allowed(&self, client: &str) -> bool {
+        let now = self.now();
+        let window = now - now.rem_euclid(600);
+        let m = match self.login_failures.lock() {
+            Ok(m) => m,
+            Err(_) => return false,
+        };
+        match m.get(client) {
+            Some((w, n)) if *w == window => *n < self.config.login_attempts_per_10m,
+            _ => true,
+        }
+    }
+
+    /// Count one failed attempt.
+    pub fn login_failed(&self, client: &str) {
+        let now = self.now();
+        let window = now - now.rem_euclid(600);
+        if let Ok(mut m) = self.login_failures.lock() {
+            let e = m.entry(client.to_string()).or_insert((window, 0));
+            if e.0 != window {
+                *e = (window, 0);
+            }
+            e.1 += 1;
+        }
+    }
+
+    /// Whether the daemon has been told it sits behind a reverse proxy.
+    pub fn is_exposed(&self) -> bool {
+        self.config.public_origin.is_some()
+    }
+
+    /// Write the §4.4 acknowledgement record. Called once at serve start when
+    /// `public_origin` is set, so the ledger shows when exposure began.
+    pub fn record_exposure(&self) {
+        if let Some(origin) = &self.config.public_origin {
+            let v = self.vault();
+            if let Err(e) = v.audit_event(
+                &Actor::System,
+                "exposure_acknowledged",
+                None,
+                "ok",
+                serde_json::json!({ "public_origin": origin, "login_attempts_per_10m": self.config.login_attempts_per_10m }),
+            ) {
+                tracing::error!(error = %e, "could not record exposure acknowledgement");
+            }
+        }
     }
 
     // -------------------------------------------------------------- ticker

@@ -1,0 +1,36 @@
+# /etc/systemd/system/bsc.service — system-level unit for a server host.
+# The user-level unit `bsc service install` writes is for a workstation; a
+# server wants a dedicated unprivileged user and no dependency on a login.
+[Unit]
+Description=Bastet Secret Chain vault daemon (loopback, behind nginx)
+Documentation=https://github.com/yamantaka520/Bastet-Secret-Chain
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bsc
+Group=bsc
+ExecStart=/usr/local/bin/bsc serve --vault /var/lib/bsc/vault.bsc --bind 127.0.0.1:8790 --public-origin https://sec.bastet.tw
+Restart=on-failure
+RestartSec=2
+Environment=RUST_LOG=info
+Environment=HOME=/var/lib/bsc
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/bsc
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target

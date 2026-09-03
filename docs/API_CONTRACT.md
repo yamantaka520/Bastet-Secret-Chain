@@ -159,8 +159,15 @@ are all dropped on seal. Every other human route requires the cookie.
 **Same-origin.** State-changing human calls must carry an `X-BSC-Client`
 header (any value); its presence forces a CORS preflight that a foreign page
 cannot pass. Any request with an `Origin` header that is not
-`http://127.0.0.1:*` or `http://localhost:*` is refused with
-`forbidden_origin`. A `bsct_` token never grants the human surface.
+`http://127.0.0.1:*`, `http://localhost:*`, or the single configured
+`--public-origin` is refused with `forbidden_origin`. A `bsct_` token never
+grants the human surface.
+
+**Login throttle.** `POST /v1/vault/unseal` allows 5 failed attempts per
+client per 10-minute window; further attempts return `429 rate_limited` with
+`retry_after: 600` without running the KDF. The client key is the first
+`X-Forwarded-For` hop when `--public-origin` is set, otherwise one shared
+local bucket.
 
 ### 2.3 Ledger actions this API produces
 

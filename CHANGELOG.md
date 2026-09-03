@@ -113,6 +113,16 @@ release exists. Until then every change lands under `Unreleased`.
 - `docs/M4_VALIDATION.md`, which states that the reboot survival test was not
   performed on any platform.
 
+- **Reverse-proxy exposure (pulled forward from M6/M7)**: `bsc serve
+  --public-origin <scheme://host>` accepts that Origin on the human surface,
+  marks the session cookie `Secure` on https, keys the new login throttle
+  (5 failed attempts per client per 10 minutes) on the first `X-Forwarded-For`
+  hop, records `exposure_acknowledged` at start, and shows the origin in
+  `/v1/vault/status`; `bsc service install --public-origin` bakes it into the
+  definition. Without the flag `X-Forwarded-For` is ignored and the throttle is
+  one local bucket. `deploy/` holds the nginx site, proxy snippet, and a
+  hardened system unit; `docs/DEPLOY_REVERSE_PROXY.md` explains the trade-offs.
+
 ### Status
 
 - M4 delivered on 2026-09-04: 95 passing tests and three release artifacts on

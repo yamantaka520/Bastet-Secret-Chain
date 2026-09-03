@@ -96,7 +96,16 @@ pub async fn serve(
     }
     let listener = tokio::net::TcpListener::bind(bind).await?;
     tracing::info!(%bind, "bsc daemon listening");
-    eprintln!("Bastet Secret Chain UI: http://{bind}/");
+    match &state.config.public_origin {
+        Some(o) => {
+            eprintln!(
+                "Bastet Secret Chain UI: http://{bind}/  (public origin {o} via reverse proxy)"
+            );
+            tracing::warn!(public_origin = %o, "exposure acknowledged: a reverse proxy is expected to front this daemon");
+            state.record_exposure();
+        }
+        None => eprintln!("Bastet Secret Chain UI: http://{bind}/"),
+    }
     state.spawn_ticker();
     axum::serve(listener, app(state))
         .with_graceful_shutdown(shutdown)

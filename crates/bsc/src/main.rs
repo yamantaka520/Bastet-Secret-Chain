@@ -43,9 +43,15 @@ enum Cmd {
     Serve {
         #[arg(long, default_value_os_t = default_vault())]
         vault: PathBuf,
-        /// Loopback only until remote exposure is implemented.
+        /// Loopback only; remote clients reach the daemon through a reverse proxy.
         #[arg(long, default_value = "127.0.0.1:8787")]
         bind: SocketAddr,
+        /// Acknowledge that a TLS reverse proxy fronts this daemon at this
+        /// origin (e.g. https://sec.example). Accepts that Origin, marks the
+        /// session cookie Secure, throttles logins per forwarded client
+        /// address, and writes exposure_acknowledged to the ledger.
+        #[arg(long)]
+        public_origin: Option<String>,
     },
     /// Serve MCP over stdio as a client of a running daemon.
     Mcp {
@@ -85,6 +91,9 @@ enum ServiceCmd {
         vault: PathBuf,
         #[arg(long, default_value = "127.0.0.1:8787")]
         bind: String,
+        /// Reverse-proxy origin to bake into the service definition.
+        #[arg(long)]
+        public_origin: Option<String>,
         /// Print the definition and the commands without touching the system.
         #[arg(long)]
         dry_run: bool,
@@ -188,13 +197,34 @@ fn run() -> Result<(), String> {
             );
             Ok(())
         }
-        Cmd::Serve { vault, bind } => {
+        Cmd::Serve {
+            vault,
+            bind,
+            public_origin,
+        } => {
             let v = Vault::open(&vault).map_err(|e| format!("{}: {e}", vault.display()))?;
-            let notifier = std::sync::Arc::new(bsc_daemon::notify::OsNotifier {
-                ui_url: format!("http://{bind}/"),
-            });
-            let state =
-                bsc_daemon::AppState::new_with_notifier(v, bsc_daemon::Config::default(), notifier);
+            if let Some(o) = &public_origin {
+                let bare = o.trim_end_matches('/');
+                let scheme_ok = bare.starts_with("https://") || bare.starts_with("http://");
+                if !scheme_ok || bare.matches('/').count() != 2 {
+                    return Err(format!(
+                        "--public-origin must be scheme://host[:port] with no path, got {o:?}"
+                    ));
+                }
+                if bare.starts_with("http://") {
+                    eprintln!("warning: --public-origin is plain http; the session cookie will not be Secure and passphrases cross the network unencrypted unless the proxy terminates TLS");
+                }
+            }
+            let ui_url = public_origin
+                .clone()
+                .map(|o| format!("{}/", o.trim_end_matches('/')))
+                .unwrap_or_else(|| format!("http://{bind}/"));
+            let notifier = std::sync::Arc::new(bsc_daemon::notify::OsNotifier { ui_url });
+            let config = bsc_daemon::Config {
+                public_origin: public_origin.map(|o| o.trim_end_matches('/').to_string()),
+                ..bsc_daemon::Config::default()
+            };
+            let state = bsc_daemon::AppState::new_with_notifier(v, config, notifier);
             let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
             rt.block_on(async move {
                 let shutdown = async {
@@ -228,9 +258,10 @@ fn run() -> Result<(), String> {
             ServiceCmd::Install {
                 vault,
                 bind,
+                public_origin,
                 dry_run,
             } => {
-                let spec = service::spec_for_current(&vault, &bind)?;
+                let spec = service::spec_for_current(&vault, &bind, public_origin.as_deref())?;
                 print!("{}", service::install(&spec, dry_run)?);
                 Ok(())
             }
@@ -239,18 +270,18 @@ fn run() -> Result<(), String> {
                 bind,
                 dry_run,
             } => {
-                let spec = service::spec_for_current(&vault, &bind)?;
+                let spec = service::spec_for_current(&vault, &bind, None)?;
                 print!("{}", service::uninstall(&spec, dry_run)?);
                 Ok(())
             }
             ServiceCmd::Status { vault, bind } => {
-                let spec = service::spec_for_current(&vault, &bind)?;
+                let spec = service::spec_for_current(&vault, &bind, None)?;
                 print!("{}", service::status(&spec)?);
                 Ok(())
             }
         },
         Cmd::Doctor { vault, url, bind } => {
-            let spec = service::spec_for_current(&vault, &bind).ok();
+            let spec = service::spec_for_current(&vault, &bind, None).ok();
             let report = doctor::run(&vault, url.trim_end_matches('/'), spec.as_ref());
             print!("{report}");
             match report.worst() {

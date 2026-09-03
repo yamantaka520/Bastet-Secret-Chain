@@ -58,11 +58,22 @@ fn cookie_value(headers: &HeaderMap) -> Option<String> {
 }
 
 /// Same-origin discipline for the human surface: refuse foreign `Origin`s and
-/// require the client header on anything that changes state.
-pub fn same_origin(headers: &HeaderMap, mutating: bool) -> Result<(), ApiError> {
+/// require the client header on anything that changes state. Loopback origins
+/// are always accepted; the one configured `public_origin` is accepted too.
+pub fn same_origin(state: &AppState, headers: &HeaderMap, mutating: bool) -> Result<(), ApiError> {
     if let Some(o) = headers.get(header::ORIGIN).and_then(|v| v.to_str().ok()) {
-        let ok =
-            o.starts_with("http://127.0.0.1:") || o.starts_with("http://localhost:") || o == "null";
+        let o = o.trim_end_matches('/');
+        let ok = o.starts_with("http://127.0.0.1:")
+            || o == "http://127.0.0.1"
+            || o.starts_with("http://localhost:")
+            || o == "http://localhost"
+            || o == "null"
+            || state
+                .config
+                .public_origin
+                .as_deref()
+                .map(|p| p.trim_end_matches('/') == o)
+                .unwrap_or(false);
         if !ok {
             return Err(ApiError::forbidden_origin());
         }
@@ -73,17 +84,46 @@ pub fn same_origin(headers: &HeaderMap, mutating: bool) -> Result<(), ApiError> 
     Ok(())
 }
 
+/// The client address used as the key for login throttling. Behind a
+/// configured reverse proxy the first `X-Forwarded-For` hop is trusted —
+/// only a loopback proxy can reach the daemon at all, so the header cannot
+/// come from an untrusted peer. Without a proxy the peer is always loopback
+/// and the key degenerates to a single bucket, which is the intended
+/// behavior for a local vault.
+pub fn client_addr(state: &AppState, headers: &HeaderMap) -> String {
+    if state.is_exposed() {
+        if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
+            if let Some(first) = xff.split(',').next().map(str::trim) {
+                if !first.is_empty() {
+                    return first.to_string();
+                }
+            }
+        }
+    }
+    "loopback".to_string()
+}
+
 /// Human session from the cookie, touched.
 pub fn human(state: &AppState, headers: &HeaderMap, mutating: bool) -> Result<Actor, ApiError> {
-    same_origin(headers, mutating)?;
+    same_origin(state, headers, mutating)?;
     let id = cookie_value(headers).ok_or_else(ApiError::unauthorized)?;
     state
         .touch_human_session(&id)
         .ok_or_else(ApiError::unauthorized)
 }
 
-/// `Set-Cookie` for a new human session.
-pub fn set_cookie(id: &str) -> HeaderValue {
-    HeaderValue::from_str(&format!("{COOKIE}={id}; Path=/; HttpOnly; SameSite=Strict"))
-        .unwrap_or(HeaderValue::from_static(""))
+/// `Set-Cookie` for a new human session. `Secure` whenever the daemon is
+/// reached through an https origin.
+pub fn set_cookie(state: &AppState, id: &str) -> HeaderValue {
+    let secure = state
+        .config
+        .public_origin
+        .as_deref()
+        .map(|o| o.starts_with("https://"))
+        .unwrap_or(false);
+    let flags = if secure { "; Secure" } else { "" };
+    HeaderValue::from_str(&format!(
+        "{COOKIE}={id}; Path=/; HttpOnly; SameSite=Strict{flags}"
+    ))
+    .unwrap_or(HeaderValue::from_static(""))
 }

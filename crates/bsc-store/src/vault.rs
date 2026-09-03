@@ -301,6 +301,20 @@ impl Vault {
         Ok(())
     }
 
+    /// Append an operator-level ledger record that is not tied to an item
+    /// operation (for example `exposure_acknowledged`). `meta` must never
+    /// contain secret material.
+    pub fn audit_event(
+        &self,
+        actor: &Actor,
+        action: &str,
+        subject: Option<&str>,
+        outcome: &str,
+        meta: serde_json::Value,
+    ) -> Result<u64> {
+        self.audit_now(actor, action, subject, outcome, meta)
+    }
+
     pub(crate) fn audit_now(
         &self,
         actor: &Actor,

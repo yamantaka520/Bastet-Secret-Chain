@@ -47,6 +47,8 @@ pub struct Spec {
     pub vault: PathBuf,
     pub bind: String,
     pub home: PathBuf,
+    /// Passed through as `--public-origin` when set.
+    pub public_origin: Option<String>,
 }
 
 impl Spec {
@@ -102,7 +104,7 @@ impl Spec {
     <string>--vault</string>
     <string>{vault}</string>
     <string>--bind</string>
-    <string>{bind}</string>
+    <string>{bind}</string>{extra}
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
@@ -121,6 +123,14 @@ impl Spec {
             exe = x(&self.exe.display().to_string()),
             vault = x(&self.vault.display().to_string()),
             bind = x(&self.bind),
+            extra = self
+                .public_origin
+                .as_deref()
+                .map(|o| format!(
+                    "\n    <string>--public-origin</string>\n    <string>{}</string>",
+                    x(o)
+                ))
+                .unwrap_or_default(),
             out = x(&unix_join(&log, "bsc.log").display().to_string()),
             err = x(&unix_join(&log, "bsc.err.log").display().to_string()),
             home = x(&self.home.display().to_string()),
@@ -141,7 +151,7 @@ After=default.target
 
 [Service]
 Type=simple
-ExecStart={exe} serve --vault {vault} --bind {bind}
+ExecStart={exe} serve --vault {vault} --bind {bind}{extra}
 Restart=on-failure
 RestartSec=2
 Environment=RUST_LOG=info
@@ -157,6 +167,11 @@ WantedBy=default.target
             exe = systemd_quote(&self.exe.display().to_string()),
             vault = systemd_quote(&self.vault.display().to_string()),
             bind = self.bind,
+            extra = self
+                .public_origin
+                .as_deref()
+                .map(|o| format!(" --public-origin {}", systemd_quote(o)))
+                .unwrap_or_default(),
         )
     }
 
@@ -185,10 +200,14 @@ WantedBy=default.target
             ],
             Os::Windows => {
                 let tr = format!(
-                    "\"{}\" serve --vault \"{}\" --bind {}",
+                    "\"{}\" serve --vault \"{}\" --bind {}{}",
                     self.exe.display(),
                     self.vault.display(),
-                    self.bind
+                    self.bind,
+                    self.public_origin
+                        .as_deref()
+                        .map(|o| format!(" --public-origin {o}"))
+                        .unwrap_or_default()
                 );
                 vec![
                     s(&[
@@ -411,7 +430,11 @@ pub fn home_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
-pub fn spec_for_current(vault: &Path, bind: &str) -> Result<Spec, String> {
+pub fn spec_for_current(
+    vault: &Path,
+    bind: &str,
+    public_origin: Option<&str>,
+) -> Result<Spec, String> {
     let os = Os::current().ok_or("unsupported platform for service install")?;
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let vault = if vault.is_absolute() {
@@ -427,6 +450,7 @@ pub fn spec_for_current(vault: &Path, bind: &str) -> Result<Spec, String> {
         vault,
         bind: bind.to_string(),
         home: home_dir(),
+        public_origin: public_origin.map(|o| o.trim_end_matches('/').to_string()),
     })
 }
 
@@ -441,7 +465,26 @@ mod tests {
             vault: PathBuf::from("/home/ann/.bsc/vault.bsc"),
             bind: "127.0.0.1:8787".into(),
             home: PathBuf::from("/home/ann"),
+            public_origin: None,
         }
+    }
+
+    #[test]
+    fn public_origin_flows_into_every_definition() {
+        let mut s = spec(Os::Linux);
+        s.public_origin = Some("https://sec.example".into());
+        assert!(s
+            .unit()
+            .contains("--bind 127.0.0.1:8787 --public-origin https://sec.example"));
+        s.os = Os::Macos;
+        let p = s.plist();
+        assert!(p.contains(
+            "<string>--public-origin</string>\n    <string>https://sec.example</string>"
+        ));
+        s.os = Os::Windows;
+        assert!(s.install_commands()[0]
+            .join(" ")
+            .contains("--public-origin https://sec.example"));
     }
 
     #[test]
