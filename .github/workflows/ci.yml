@@ -129,9 +129,11 @@ jobs:
         run: |
           set -e
           cd dist
-          f=$(ls bsc-*.tar.gz bsc-*.zip 2>/dev/null | head -1)
+          f=""
+          for cand in bsc-*.tar.gz bsc-*.zip; do [ -e "$cand" ] && f="$cand" && break; done
+          [ -n "$f" ] || { echo "no archive found"; ls -la; exit 1; }
           if [[ "$f" == *.zip ]]; then 7z x "$f" > /dev/null; else tar xzf "$f"; fi
-          d=$(ls -d bsc-*/ | head -1)
+          d=$(find . -maxdepth 1 -type d -name 'bsc-*' | head -1)
           "$d/bsc${{ matrix.ext }}" --version
           echo "ci-passphrase" | "$d/bsc${{ matrix.ext }}" init --passphrase-stdin --vault ./smoke.bsc
           "$d/bsc${{ matrix.ext }}" audit --vault ./smoke.bsc
