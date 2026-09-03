@@ -53,25 +53,27 @@ impl Spec {
     /// Where the definition file lives (Windows has none; the task is in the
     /// scheduler's own store).
     pub fn definition_path(&self) -> Option<PathBuf> {
+        // Joined with '/' explicitly: these paths describe the *target* OS and
+        // must not pick up the host's separator when generated or tested on
+        // Windows.
         match self.os {
-            Os::Macos => Some(
-                self.home
-                    .join("Library/LaunchAgents")
-                    .join(format!("{LABEL}.plist")),
-            ),
-            Os::Linux => Some(
-                self.home
-                    .join(".config/systemd/user")
-                    .join(format!("{UNIT}.service")),
-            ),
+            Os::Macos => Some(unix_join(
+                &self.home,
+                &format!("Library/LaunchAgents/{LABEL}.plist"),
+            )),
+            Os::Linux => Some(unix_join(
+                &self.home,
+                &format!(".config/systemd/user/{UNIT}.service"),
+            )),
             Os::Windows => None,
         }
     }
 
     pub fn log_dir(&self) -> PathBuf {
         match self.os {
-            Os::Macos => self.home.join("Library/Logs/bsc"),
-            Os::Linux | Os::Windows => self.home.join(".bsc/logs"),
+            Os::Macos => unix_join(&self.home, "Library/Logs/bsc"),
+            Os::Linux => unix_join(&self.home, ".bsc/logs"),
+            Os::Windows => self.home.join(".bsc").join("logs"),
         }
     }
 
@@ -119,8 +121,8 @@ impl Spec {
             exe = x(&self.exe.display().to_string()),
             vault = x(&self.vault.display().to_string()),
             bind = x(&self.bind),
-            out = x(&log.join("bsc.log").display().to_string()),
-            err = x(&log.join("bsc.err.log").display().to_string()),
+            out = x(&unix_join(&log, "bsc.log").display().to_string()),
+            err = x(&unix_join(&log, "bsc.err.log").display().to_string()),
             home = x(&self.home.display().to_string()),
         )
     }
@@ -240,6 +242,13 @@ fn uid() -> String {
         }
     }
     "501".to_string()
+}
+
+/// `base/rest` with a forward slash regardless of host, for paths that belong
+/// to a Unix target.
+fn unix_join(base: &Path, rest: &str) -> PathBuf {
+    let b = base.display().to_string();
+    PathBuf::from(format!("{}/{}", b.trim_end_matches('/'), rest))
 }
 
 fn xml_escape(s: &str) -> String {
