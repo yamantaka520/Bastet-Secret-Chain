@@ -112,3 +112,13 @@ with `schema::migrate` run by `Vault::open` (columns added, `approval` and
 `schema_migrated`, one transaction), tested against a file rewritten into the
 exact schema-1 shape (`crates/bsc-store/tests/migrate.rs`). The M6 tests all
 passed because every test creates a fresh vault — a gap the new test closes.
+
+Production recovery, 2026-09-04: a consistent copy of the schema-1 file was
+taken first (`sqlite3` backup API, `/var/lib/bsc/vault.pre-schema2-20260904.bsc`),
+then the `cc846c0` artifact was installed and the service restarted. The
+migration ran at open: `schema_version` 2, both new columns present, no item
+foreign key on `approval`, cascade on `access_grant`, `pragma foreign_key_check`
+empty, ledger record 25 `schema_migrated` followed by the unattended unseal,
+`bsc audit` intact at 27 records, zero errors in the new invocation, UI
+rendering again. The pre-migration copy stays on the host until the operator
+decides to remove it.
