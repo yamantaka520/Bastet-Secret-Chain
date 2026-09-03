@@ -122,9 +122,10 @@ it idempotently through the API with a token read from a file:
    *Failed on the first run (token had Zone:Read but not DNS:Edit); created on
    the second run after the operator widened the token.*
 3. **Access** — a self-hosted app of type `ssh` for the hostname with one
-   policy, **Bypass** when the client IP is `172.216.48.153/32` or
-   `59.124.17.34/32`. Everything else is denied at Cloudflare's edge before
-   reaching the tunnel. *Done* (app `508fe70e-…`).
+   policy, **Bypass** when the client IP is `172.216.48.153/32`,
+   `59.124.17.34/32`, or `1.34.128.101/32` (the third added on request the
+   same day). Everything else is denied at Cloudflare's edge before reaching
+   the tunnel. *Done* (app `508fe70e-…`).
 
 Client side, on an allow-listed machine with `cloudflared` installed:
 
@@ -140,14 +141,24 @@ sshd on the host already has `PasswordAuthentication no` and
 already key-only service; it does not replace key auth. Port 22 remains open
 on the LAN as before — closing it is a separate decision.
 
-Verified from a **non**-allow-listed address (1.34.128.101): an HTTPS request
-to `ssh.bastet.tw` at the Cloudflare edge returns **403** from Access — the
-Bypass policy did not match, so the default deny applied and nothing reached
-the tunnel. The positive test (`ssh` through `cloudflared access ssh` from one
-of the two allow-listed addresses) is the operator's to run from those
-machines; it has not been observed here. Note for clients without IPv6
-routing: `cloudflared` may pick a v6 edge address first and fail with "no
-route to host" — the Access verdict above was obtained by forcing IPv4.
+Verified both ways on 2026-09-04:
+
+- **Denied** — before `1.34.128.101` was on the list, an HTTPS request from it
+  to `ssh.bastet.tw` at the Cloudflare edge returned **403** from Access.
+- **Allowed** — after adding it, `ssh -o ProxyCommand="cloudflared access ssh
+  --hostname %h" CatWhiskers@ssh.bastet.tw` run *from the host itself* (whose
+  egress is that same address) came back through Cloudflare and the tunnel:
+  `TUNNEL-OK host=hermes-agent user=CatWhiskers`, and sshd logged `Accepted
+  publickey for CatWhiskers from 127.0.0.1` — the connection arrives from
+  `cloudflared` on loopback, as designed. The key was lent to the host for the
+  test through a 10-minute agent forward, never copied.
+
+Client caveat: on a machine without an IPv6 default route, `cloudflared
+access ssh` dials the edge's AAAA first and fails with `no route to host`
+instead of falling back to A. The operator's Mac hit exactly this; the fix is
+IPv6 connectivity on the client, not anything on the server. A plain HTTPS
+`GET` to an `ssh`-type Access app returns 403 even from an allowed IP, so
+`curl` is not a positive test for this app type — only `ssh` is.
 
 ## Not done
 
@@ -158,6 +169,7 @@ route to host" — the Access verdict above was obtained by forcing IPv4.
   `bsc service install --system` does not exist yet.
 - `bsc doctor` cannot check file permissions on a remote vault.
 - The origin's direct reachability on the public IP (above) is not mitigated.
-- The positive SSH test from an allow-listed machine has not been observed.
+- The positive SSH test was observed from the host's own egress, not yet
+  from `172.216.48.153` or `59.124.17.34`.
 - The Cloudflare API token used for the setup should now be revoked or
   narrowed by the operator; it was read from a file and never printed.

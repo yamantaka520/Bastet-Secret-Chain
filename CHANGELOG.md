@@ -126,6 +126,10 @@ release exists. Until then every change lands under `Unreleased`.
   so `bsc mcp` and `bsc doctor` could not reach an https daemon; `doctor`
   failed every non-loopback URL instead of consulting the daemon's declared
   `public_origin`. Both found on the first remote check of a deployment.
+- `sec.bastet.tw` is live behind nginx and Cloudflare (system unit, user
+  `bsc`, sealed until unsealed in the UI); `ssh.bastet.tw` routes through the
+  existing tunnel with Access allowing three addresses — denied and allowed
+  paths both observed.
 - `deploy/cloudflare-ssh-tunnel.sh`: idempotently publishes a host's sshd on
   an existing remotely-managed Cloudflare Tunnel (ingress + proxied CNAME +
   Access app with a Bypass-by-IP policy), token read from a file, never
