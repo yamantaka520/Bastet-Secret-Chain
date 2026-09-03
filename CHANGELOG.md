@@ -115,8 +115,10 @@ release exists. Until then every change lands under `Unreleased`.
 
 ### Status
 
-- M4 partially delivered on 2026-09-04 with 95 passing tests; CI evidence
-  pending; reboot survival untested. No tag, no release.
+- M4 delivered on 2026-09-04: 95 passing tests and three release artifacts on
+  CI run `33777806776`; the LaunchAgent was installed, hard-killed, watched
+  restart, and removed on a real Mac; the reboot itself was not performed on
+  any platform. No tag, no release.
 - M3 gate met on 2026-09-03: 82 passing tests locally and on Ubuntu, macOS,
   and Windows with the UI built and embedded (CI run `33769473982`). M4
   (packaging and auto-start) not started. No release.

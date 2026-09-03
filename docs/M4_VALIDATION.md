@@ -131,4 +131,22 @@ observation. The master plan status table says so.
 
 | Run | Commit | Ubuntu | macOS | Windows | Artifacts ×3 | Hygiene |
 | --- | --- | --- | --- | --- | --- | --- |
-| _pending_ | — | — | — | — | — | — |
+| [`33777806776`](https://github.com/yamantaka520/Bastet-Secret-Chain/actions/runs/33777806776) | `e631a8d` | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+Rust jobs: UI build, fmt, clippy `-D warnings`, 95 tests, KAT regeneration,
+`plutil -lint` (macOS) and `systemd-analyze verify` (Linux) on the generated
+definitions, `doctor` on a fresh vault. Artifact jobs: release build with the
+UI embedded, packaged with `.sha256`, unpacked and smoke-tested
+(`--version`, `init --passphrase-stdin`, `audit`), uploaded:
+
+```
+  bsc-x86_64-pc-windows-msvc  2489478 bytes
+  bsc-x86_64-unknown-linux-gnu  3152407 bytes
+  bsc-aarch64-apple-darwin  2774080 bytes
+```
+
+Three earlier runs on the same work failed or were cancelled before this one
+passed: a Windows-only unit-test failure (host path separator leaking into a
+macOS plist — fixed by joining target-OS paths with `/`), and an artifact
+smoke step that tripped the runner's `pipefail` on a glob (fixed). Both are in
+the commit history rather than squashed away.
