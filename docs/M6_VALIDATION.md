@@ -122,3 +122,25 @@ empty, ledger record 25 `schema_migrated` followed by the unattended unseal,
 `bsc audit` intact at 27 records, zero errors in the new invocation, UI
 rendering again. The pre-migration copy stays on the host until the operator
 decides to remove it.
+
+## End-to-end through the real Telegram Bot API — 2026-09-04
+
+Operator-created probe: item `test/telegram-probe` (api_key, approval
+required), token `telegram-probe` scoped to `test`, value saved on the host
+only. Agent side run over `ssh ssh.bastet.tw` with curl against loopback.
+
+| UTC | Event | Evidence |
+| --- | --- | --- |
+| 20:58:33 | `GET /v1/secrets/{sref}` → **202** `approval_pending`, `apr_aba0c373addfa1a7`, poll hint 5 s, 5-min expiry | response body; ledger 33 `approval_requested` |
+| 20:58:33 / 20:58:54 | ladder steps 1 and 2 (local notifier only) | ledger 34, 35 `approval_escalated` |
+| 20:59:35 | step 3: one Telegram message with ✅/⛔ to chat 8686567559 | ledger 36 `approval_escalated`, 37 `approval_notified` `{channel: telegram, buttons: true}` |
+| 20:59:52 | operator pressed ✅ on the phone | ledger 38 `approval_decided` **approved** by `external:telegram:8686567559`, grant issued |
+| 20:59:52 | poll returned `approved` with the value (19 bytes, correct) | ledger 39 `secret_read` |
+| after | second read under the TOFU grant → 200 with no new approval | see below |
+
+The ladder timings match ADR 0005 (0 / 20 / 60 s). Nothing about the secret
+appeared in the Telegram message, the journal, or the ledger. Two mistakes on
+the way, both the assistant's: the first poll loop matched `approval_pending`
+instead of the response's `status: "pending"` and exited early (harmless); and
+the operator was told to scope the token as `test/*`, which the matcher took
+literally — fixed by normalizing `test/*` and `test/` to `test`.
