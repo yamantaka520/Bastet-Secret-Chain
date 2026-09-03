@@ -60,8 +60,33 @@ release exists. Until then every change lands under `Unreleased`.
 - GitHub Actions CI: fmt, clippy `-D warnings`, tests on Ubuntu/macOS/Windows,
   KAT regeneration check, and a credential-pattern scan of the tree.
 
+- **M2 — `bsc-store` access layer**: tokens stored as a SHA-256 hash with
+  encrypted label and scope; renewal inside the final quarter of life plus a
+  five-minute grace, capped at a maximum lifetime, never widening scope; read
+  quotas; task sessions with an eight-hour cap and no renewal; approvals with
+  deduplicated pending requests, decisions, timeouts, and an escalation
+  ladder recorded step by step; trust-on-first-use grants capped at token
+  expiry; `local_approval_only`; an injectable clock; `verify_passphrase`.
+- **M2 — `bsc-daemon`**: `/v1` agent surface (`GET /secrets`,
+  `GET /secrets/{sref}[/versions/{n}]`, `POST /access-requests`,
+  `GET /access-requests/{apr}`, `POST /token/renew`, `GET /token`) and human
+  surface (vault, items, versions, reveal, tokens, sessions, approvals, audit,
+  handoff stub); `202 approval_pending` with `Retry-After` and `Location`;
+  the full error contract with `next_action` and `do_not`; cookie +
+  `X-BSC-Client` + `Origin` same-origin discipline; per-token rate limiting;
+  approval ticker with a `Notifier` seam; loopback-only `serve`.
+- **M2 — `bsc-mcp`**: JSON-RPC 2.0 stdio server with exactly five read-only
+  tools, safety text in descriptions and `instructions`, reason sent in a
+  header, results identical to the HTTP body, `isError` false for `202`.
+- **M2 — `bsc`**: `init`, `serve`, `mcp`, `audit`.
+- `docs/M2_VALIDATION.md`; `docs/API_CONTRACT.md` revised to what was built
+  (renewable expiry is `401`, reveal is `POST`, sessions cover local-only
+  items, item id is the sref, human codes and same-origin added).
+
 ### Status
 
+- M2 delivered locally on 2026-09-03 with 79 passing tests; CI evidence
+  pending. M3 (Web UI) not started. No release.
 - M1 gate met on 2026-09-03: 43 passing tests locally and on Ubuntu, macOS,
   and Windows (CI run `33761893191`). M2 has a contract but no code. No
   release.

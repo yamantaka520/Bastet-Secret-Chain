@@ -100,6 +100,9 @@ pub struct ItemMeta {
     pub expires_at: Option<i64>,
     /// Whether reads need approval.
     pub approval_required: bool,
+    /// Whether approval may only be given from the local UI, never from an
+    /// external channel (ADR 0005 §4).
+    pub local_approval_only: bool,
     /// Highest version number.
     pub current_version: u32,
     /// Plaintext size of the current version in bytes.

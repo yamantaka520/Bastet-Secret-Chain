@@ -7,12 +7,12 @@ without the secret ever living in a URL, a prompt, or a shell history.**
 Humans put credentials in through a Web UI. Agents take them out through an
 authenticated reference. Every retrieval is appended to a tamper-evident chain.
 
-> **Status: M1 complete; M2 contract drafted.**
-> `bsc-crypto` and `bsc-store` implement the envelope encryption, sealed
-> SQLite vault, blind index, and hash-chained ledger with 43 passing tests.
-> There is no daemon, API, MCP server, or UI yet — their shape is fixed in
-> [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md). Evidence and explicit gaps:
-> [`docs/M1_VALIDATION.md`](docs/M1_VALIDATION.md).
+> **Status: M2 delivered — daemon, tokens, approvals, MCP. No UI yet.**
+> `bsc serve` runs the `/v1` API on loopback; `bsc mcp` gives an agent five
+> read-only tools; every read is scoped, quota'd, audited, and — for
+> high-value items — held for human approval. 79 passing tests. Evidence and
+> explicit gaps: [`docs/M2_VALIDATION.md`](docs/M2_VALIDATION.md). The Web
+> UI is M3; until then the human surface is HTTP.
 
 ## What it stores
 
@@ -71,6 +71,7 @@ not follow them there.
 | [`docs/UX_PLAN.md`](docs/UX_PLAN.md) | Web UI information architecture and interactions |
 | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) | HTTP API and MCP tool contract, error codes, `do_not` text |
 | [`docs/M1_VALIDATION.md`](docs/M1_VALIDATION.md) | M1 test evidence and what is explicitly not done |
+| [`docs/M2_VALIDATION.md`](docs/M2_VALIDATION.md) | M2 evidence: the error-contract and MCP-parity gate tests, explicit gaps |
 | [`docs/adr/`](docs/adr) | Architecture decision records 0001–0006 |
 | [`CHANGELOG.md`](CHANGELOG.md) | History of changes |
 
@@ -81,6 +82,34 @@ M3 Web UI →
 M4 packaging and auto-start → M5 agent integration → M6 rotation, delegation,
 external approval → M7 hardening and first release. Gates are defined in the master
 plan; nothing is claimed done until its gate is met.
+
+## Running it today
+
+```sh
+bsc init                      # creates ~/.bsc/vault.bsc, prompts for a passphrase
+bsc serve                     # http://127.0.0.1:8787, starts sealed
+bsc audit                     # verify the ledger offline
+```
+
+Unseal and work through the human API (the UI arrives in M3):
+
+```sh
+curl -c jar -H 'X-BSC-Client: cli' -H 'Content-Type: application/json' \
+  -d '{"passphrase":"…"}' http://127.0.0.1:8787/v1/vault/unseal
+curl -b jar -H 'X-BSC-Client: cli' -H 'Content-Type: application/json' \
+  -d '{"path":"prod/gcp","name":"firebase-admin","type":"service_account","value":"…"}' \
+  http://127.0.0.1:8787/v1/items
+curl -b jar -H 'X-BSC-Client: cli' -H 'Content-Type: application/json' \
+  -d '{"label":"deploy-bot","scope":{"paths":["prod"]},"lifetime":86400}' \
+  http://127.0.0.1:8787/v1/tokens        # the bsct_ value appears once, here
+```
+
+Give an agent the MCP server, not the token in a prompt:
+
+```json
+{ "mcpServers": { "bsc": { "command": "bsc", "args": ["mcp"],
+  "env": { "BSC_TOKEN": "bsct_…" } } } }
+```
 
 ## Building
 

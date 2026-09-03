@@ -19,6 +19,9 @@ use crate::{
     schema, Result, StoreError,
 };
 
+/// Source of "now" in Unix seconds. Injectable so tests can move time.
+pub type Clock = Box<dyn Fn() -> i64 + Send + Sync>;
+
 /// Who is performing an operation. Rendered into the audit ledger.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Actor {
@@ -37,7 +40,7 @@ pub enum Actor {
 }
 
 impl Actor {
-    fn label(&self) -> String {
+    pub(crate) fn label(&self) -> String {
         match self {
             Actor::Human { session } => format!("human:{session}"),
             Actor::Token { id } => format!("token:{id}"),
@@ -53,23 +56,41 @@ enum State {
 
 /// A sealed or unsealed vault backed by one SQLite file.
 pub struct Vault {
-    conn: Connection,
+    pub(crate) conn: Connection,
     params: KdfParams,
     verifier: Sealed,
     state: State,
+    clock: Clock,
 }
 
-fn now() -> i64 {
+fn system_now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
 }
 
-fn new_id() -> Result<String> {
-    let mut b = [0u8; 8];
+/// Random bytes or a `Randomness` error; never a silent zero id.
+pub(crate) fn random_bytes<const N: usize>() -> Result<[u8; N]> {
+    let mut b = [0u8; N];
     getrandom::getrandom(&mut b).map_err(|_| bsc_crypto::CryptoError::Randomness)?;
-    Ok(format!("it_{}", hex::encode(b)))
+    Ok(b)
+}
+
+/// `prefix_` + 16 hex characters (64 random bits). For ids that appear in the
+/// ledger and logs.
+pub(crate) fn hex_id(prefix: &str) -> Result<String> {
+    Ok(format!("{prefix}_{}", hex::encode(random_bytes::<8>()?)))
+}
+
+/// Item reference: `sref_` + 22 base64url characters (128 random bits). This
+/// is the value the UI's copy button yields; it identifies and grants nothing.
+fn new_sref() -> Result<String> {
+    use base64::Engine as _;
+    Ok(format!(
+        "sref_{}",
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random_bytes::<16>()?)
+    ))
 }
 
 fn get_meta(conn: &Connection, key: &str) -> Result<Option<String>> {
@@ -142,7 +163,7 @@ impl Vault {
         set_meta(&tx, "verifier", &hex::encode(verifier.to_vec()))?;
         audit::append(
             &tx,
-            now(),
+            system_now(),
             &Actor::System.label(),
             "vault_created",
             None,
@@ -161,6 +182,7 @@ impl Vault {
             params,
             verifier,
             state: State::Unsealed { kek, index },
+            clock: Box::new(system_now),
         })
     }
 
@@ -211,7 +233,19 @@ impl Vault {
             params,
             verifier,
             state: State::Sealed,
+            clock: Box::new(system_now),
         })
+    }
+
+    /// Replace the time source. Tests use this to expire tokens and time out
+    /// approvals without sleeping; production leaves the default.
+    pub fn set_clock(&mut self, clock: Clock) {
+        self.clock = clock;
+    }
+
+    /// Current time from the vault's clock, in Unix seconds.
+    pub fn now(&self) -> i64 {
+        (self.clock)()
     }
 
     /// Whether encrypted content is currently unreadable.
@@ -240,6 +274,23 @@ impl Vault {
         Ok(())
     }
 
+    /// Check a passphrase against the header without changing seal state.
+    /// Used for login to an already-unsealed vault and for re-authentication
+    /// before revealing approval-required items. Both outcomes are recorded
+    /// as `login`.
+    pub fn verify_passphrase(&self, passphrase: &[u8], actor: &Actor) -> Result<bool> {
+        let kek = Kek::derive(passphrase, &self.params)?;
+        let ok = envelope::check_verifier(&kek, &self.verifier);
+        self.audit_now(
+            actor,
+            "login",
+            None,
+            if ok { "ok" } else { "denied" },
+            serde_json::json!({}),
+        )?;
+        Ok(ok)
+    }
+
     /// Drop the KEK. Zeroization happens in `Kek`'s `Drop`.
     pub fn seal(&mut self, actor: &Actor) -> Result<()> {
         let was_sealed = self.is_sealed();
@@ -250,7 +301,7 @@ impl Vault {
         Ok(())
     }
 
-    fn audit_now(
+    pub(crate) fn audit_now(
         &self,
         actor: &Actor,
         action: &str,
@@ -260,7 +311,7 @@ impl Vault {
     ) -> Result<u64> {
         audit::append(
             &self.conn,
-            now(),
+            self.now(),
             &actor.label(),
             action,
             subject,
@@ -269,7 +320,7 @@ impl Vault {
         )
     }
 
-    fn keys(&self) -> Result<(&Kek, &IndexKey)> {
+    pub(crate) fn keys(&self) -> Result<(&Kek, &IndexKey)> {
         match &self.state {
             State::Unsealed { kek, index } => Ok((kek, index)),
             State::Sealed => Err(StoreError::Sealed),
@@ -291,8 +342,8 @@ impl Vault {
             return Err(StoreError::Invalid("empty path"));
         }
         let (kek, index) = self.keys()?;
-        let id = new_id()?;
-        let ts = now();
+        let id = new_sref()?;
+        let ts = self.now();
         let approval_required = new
             .approval_required
             .unwrap_or_else(|| new.item_type.approval_required_by_default());
@@ -331,8 +382,8 @@ impl Vault {
         let tx = self.conn.unchecked_transaction()?;
         tx.execute(
             "INSERT INTO item (id, item_type, env, created, updated, expires_at, approval_required,
-                               current_version, path_ct, name_ct, tags_ct)
-             VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6, 1, ?7, ?8, ?9)",
+                               local_approval_only, current_version, path_ct, name_ct, tags_ct)
+             VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6, 0, 1, ?7, ?8, ?9)",
             params![
                 id,
                 new.item_type.as_str(),
@@ -401,7 +452,7 @@ impl Vault {
             .optional()?
             .ok_or(StoreError::NotFound)?;
         let n = current + 1;
-        let ts = now();
+        let ts = self.now();
         let aad = Aad {
             item_id: id,
             version: n,
@@ -510,7 +561,7 @@ impl Vault {
             .optional()?;
         let (wrapped, body_ct) = row.ok_or(StoreError::NotFound)?;
 
-        let ts = now();
+        let ts = self.now();
         let actor_label = actor.label();
         let meta = serde_json::json!({ "version": n, "reason": reason });
 
@@ -575,6 +626,7 @@ impl Vault {
             updated: row.get(4)?,
             expires_at: row.get(5)?,
             approval_required: row.get::<_, i64>(6)? != 0,
+            local_approval_only: row.get::<_, i64>(9)? != 0,
             current_version: row.get(7)?,
             size: row.get::<_, i64>(8)? as u64,
         })
@@ -582,7 +634,7 @@ impl Vault {
 
     const META_SELECT: &'static str =
         "SELECT i.id, i.item_type, i.env, i.created, i.updated, i.expires_at,
-                i.approval_required, i.current_version, v.size
+                i.approval_required, i.current_version, v.size, i.local_approval_only
          FROM item i JOIN version v ON v.item_id = i.id AND v.n = i.current_version";
 
     /// Clear metadata for every item. Works while sealed.
@@ -679,6 +731,63 @@ impl Vault {
             serde_json::json!({ "tokens": tokens.len(), "hits": ids.len() }),
         )?;
         Ok(ids)
+    }
+
+    /// Update clear metadata flags. Each `Some` is applied; `None` leaves the
+    /// column alone. `expires_at: Some(None)` clears the expiry.
+    pub fn set_item_flags(
+        &mut self,
+        id: &str,
+        approval_required: Option<bool>,
+        local_approval_only: Option<bool>,
+        expires_at: Option<Option<i64>>,
+        env: Option<Option<String>>,
+        actor: &Actor,
+    ) -> Result<ItemMeta> {
+        self.meta(id)?;
+        let ts = self.now();
+        let tx = self.conn.unchecked_transaction()?;
+        if let Some(v) = approval_required {
+            tx.execute(
+                "UPDATE item SET approval_required = ?2, updated = ?3 WHERE id = ?1",
+                params![id, v as i64, ts],
+            )?;
+        }
+        if let Some(v) = local_approval_only {
+            tx.execute(
+                "UPDATE item SET local_approval_only = ?2, updated = ?3 WHERE id = ?1",
+                params![id, v as i64, ts],
+            )?;
+        }
+        if let Some(v) = expires_at {
+            tx.execute(
+                "UPDATE item SET expires_at = ?2, updated = ?3 WHERE id = ?1",
+                params![id, v, ts],
+            )?;
+        }
+        if let Some(v) = &env {
+            tx.execute(
+                "UPDATE item SET env = ?2, updated = ?3 WHERE id = ?1",
+                params![id, v, ts],
+            )?;
+        }
+        audit::append(
+            &tx,
+            ts,
+            &actor.label(),
+            "item_updated",
+            Some(id),
+            "ok",
+            &serde_json::json!({
+                "approval_required": approval_required,
+                "local_approval_only": local_approval_only,
+                "expires_at": expires_at,
+                "env": env,
+            })
+            .to_string(),
+        )?;
+        tx.commit()?;
+        self.meta(id)
     }
 
     /// Recompute the whole audit chain. Works while sealed.

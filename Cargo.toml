@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/bsc-crypto", "crates/bsc-store"]
+members = ["crates/bsc-crypto", "crates/bsc-store", "crates/bsc-daemon", "crates/bsc-mcp", "crates/bsc"]
 
 [workspace.package]
 version = "0.0.0"
@@ -11,17 +11,28 @@ rust-version = "1.82"
 
 [workspace.dependencies]
 argon2 = "0.5"
+axum = "0.7"
+base64 = "0.22"
+clap = { version = "4", features = ["derive"] }
 chacha20poly1305 = "0.10"
 getrandom = "0.2"
 hex = "0.4"
 hkdf = "0.12"
 hmac = "0.12"
 proptest = "1"
+reqwest = { version = "0.12", default-features = false, features = ["json"] }
+rpassword = "7"
 rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "0.10"
 subtle = "2.6"
 tempfile = "3"
+time = { version = "0.3", features = ["formatting"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-std", "io-util", "sync", "time", "signal"] }
+tower = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2"
 zeroize = { version = "1", features = ["derive"] }
 

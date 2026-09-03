@@ -1,9 +1,19 @@
 # API and MCP Contract — v1 draft
 
-**Status:** draft for M2, 2026-09-03. Not implemented. This document fixes the
-*shape* of the daemon's HTTP API and MCP tool surface before code exists, so
-that the two cannot drift apart (ADR 0006). Where this file and the master plan
-disagree, the master plan wins and this file is wrong.
+**Status:** v1 as implemented in M2, 2026-09-03. This document fixes the
+*shape* of the daemon's HTTP API and MCP tool surface so that the two cannot
+drift apart (ADR 0006); `bsc-mcp/tests/parity.rs` asserts they return identical
+JSON and `bsc-daemon/tests/api.rs` asserts every code below is reachable with
+this shape. Where this file and the master plan disagree, the master plan wins
+and this file is wrong.
+
+**Revisions during implementation (2026-09-03):** an expired-but-renewable
+token is `401 token_expired` with `renewable: true`, not `202` — the agent can
+self-serve, so nothing is pending on a human. `/reveal` is `POST` with an
+optional passphrase, never `GET`. Task sessions cover `local-approval-only`
+items too (they are opened from the local UI; the flag restricts *external*
+approval per ADR 0005 §4). The item id **is** the `sref`; there is no separate
+reference table. Human-surface codes and the same-origin rule were added.
 
 Authority chain: [`MASTER_PLAN.md`](MASTER_PLAN.md) → this contract →
 implementation. Tests in M2 assert against this file.
@@ -28,7 +38,7 @@ implementation. Tests in M2 assert against this file.
 
 | Prefix | Meaning | Format |
 | --- | --- | --- |
-| `sref_` | Stable item reference, shown in UI, safe to paste anywhere | `sref_` + 22 base64url chars (128 bits) |
+| `sref_` | Stable item reference **and** the item's id, shown in UI, safe to paste anywhere | `sref_` + 22 base64url chars (128 bits) |
 | `bsct_` | Agent bearer token **value** — the secret, shown once at mint | `bsct_` + 43 base64url chars (256 bits) |
 | `tok_` | Token **id** — safe to log, appears in the ledger | `tok_` + 16 hex |
 | `apr_` | Approval request id | `apr_` + 16 hex |
@@ -62,8 +72,9 @@ RFC 3339 UTC. Every response carries `X-BSC-Request-Id`.
 | `POST` | `/v1/token/renew` | Extend the calling token inside its renewal window |
 | `GET` | `/v1/token` | Inspect the calling token: scope, expiry, quota — never the value |
 
-`GET /v1/secrets/{sref}` requires `?reason=` or a `X-BSC-Reason` header;
-`POST` bodies carry `reason` as a field.
+`GET /v1/secrets/{sref}` requires `?reason=` or an `X-BSC-Reason` header
+(prefer the header — it keeps the reason out of URLs and access logs; the MCP
+server always uses it); `POST` bodies carry `reason` as a field.
 
 Successful release:
 
@@ -87,7 +98,7 @@ Content-Type: application/json
 `warning` is non-null when the token has ≤ 20% of its life or ≤ 10 minutes
 left: `"token expires in 4m; call POST /v1/token/renew at a natural boundary"`.
 
-Blocked release (approval required, or token expired but renewable):
+Blocked release (approval required — a human must act):
 
 ```http
 HTTP/1.1 202 Accepted
@@ -95,6 +106,7 @@ Retry-After: 5
 Location: /v1/access-requests/apr_3f9…
 
 {
+  "error": "approval_pending",
   "status": "approval_pending",
   "approval_id": "apr_3f9…",
   "expires_at": "2026-09-03T14:07:11Z",
@@ -103,8 +115,17 @@ Location: /v1/access-requests/apr_3f9…
 }
 ```
 
-Approval poll states: `pending` → `approved` (body includes the value, once,
-then the request is consumed) | `denied` | `timeout`.
+Approval poll (`GET /v1/access-requests/{apr}`) answers `200` with
+`status: pending` (and `Retry-After`) while waiting; `200` with
+`status: approved` **plus the value body of §2.1, once** on approval; `200`
+with `status: consumed` on later polls (the grant now lets `get_secret`
+through); and the contract errors `approval_denied` (403) or `approval_timeout`
+(408) otherwise. A poll for an approval that belongs to another token is
+`not_found`.
+
+An expired token that is still inside its renewal window is **not** blocked:
+it gets `401 token_expired` with `renewable: true`, because the agent can
+recover without a human by calling renew.
 
 ### 2.2 Human surface — session cookie, loopback only
 
@@ -116,7 +137,7 @@ then the request is consumed) | `denied` | `timeout`.
 | `GET` `POST` | `/v1/items` | List / create |
 | `GET` `PATCH` | `/v1/items/{sref}` | Detail / metadata edit |
 | `POST` | `/v1/items/{sref}/versions` | Add a version (rotate) |
-| `GET` | `/v1/items/{sref}/reveal` | Human reveal — re-auth for approval-required items |
+| `POST` | `/v1/items/{sref}/reveal` | Human reveal; body `{ passphrase? }` — required for approval-required items |
 | `GET` `POST` | `/v1/tokens` | List / mint (value returned exactly once) |
 | `DELETE` | `/v1/tokens/{tok}` | Revoke |
 | `GET` `POST` | `/v1/sessions` | List / open a task session `{scope, duration}` |
@@ -130,13 +151,26 @@ then the request is consumed) | `denied` | `timeout`.
 Human-surface responses never include `value` except on `/reveal`, which
 carries `Cache-Control: no-store` and is itself a `secret_read` ledger entry.
 
+**Authentication.** `POST /v1/vault/unseal { passphrase }` is also login: it
+verifies the passphrase (unsealing if needed) and sets an `HttpOnly;
+SameSite=Strict` cookie `bsc_session`. Sessions idle out after 15 minutes and
+are all dropped on seal. Every other human route requires the cookie.
+
+**Same-origin.** State-changing human calls must carry an `X-BSC-Client`
+header (any value); its presence forces a CORS preflight that a foreign page
+cannot pass. Any request with an `Origin` header that is not
+`http://127.0.0.1:*` or `http://localhost:*` is refused with
+`forbidden_origin`. A `bsct_` token never grants the human surface.
+
 ### 2.3 Ledger actions this API produces
 
-`vault_created` `unseal` `seal` `item_created` `version_added` `secret_read`
-`search` `token_minted` `token_renewed` `token_revoked` `session_opened`
-`session_closed` `approval_requested` `approval_notified` `approval_escalated`
-`approval_decided` `approval_timeout` `handoff_minted` `handoff_used`
-`exposure_acknowledged`. Each carries `actor`, optional `subject`, `outcome`
+`vault_created` `unseal` `login` `seal` `item_created` `item_updated`
+`version_added` `secret_read` `search` `token_minted` `token_renewed`
+`token_revoked` `session_opened` `session_closed` `approval_requested`
+`approval_escalated` `approval_decided` `approval_timeout` and, once
+implemented, `handoff_minted` `handoff_used` `exposure_acknowledged`.
+`approval_escalated` carries `step`; the notification itself is the
+daemon's `Notifier`, not a separate ledger action. Each carries `actor`, optional `subject`, `outcome`
 ∈ {`ok`,`denied`,`error`,`timeout`}, and a `meta` JSON object that **never**
 contains a value, a token value, or a passphrase.
 
@@ -167,7 +201,14 @@ Canonical `get_secret` description (the text the model reads):
 > about to do with it.
 
 MCP results are the same JSON as the HTTP responses in §2.1, so a test can
-assert equality between the two paths for every code in §4.
+assert equality between the two paths for every code in §4. Concretely, a
+`tools/call` result is `{ content: [{ type: "text", text }], structuredContent,
+isError }` where `structuredContent` is the daemon's body verbatim minus
+`request_id`, `text` is the same JSON pretty-printed, and `isError` is true
+for any 4xx/5xx — **but false for `202 approval_pending`**, which is a wait,
+not a failure. Two codes originate in the MCP server itself, with the same
+shape: `daemon_unreachable` (the daemon is down; `next_action` names
+`bsc serve`) and `unknown_tool`. Bad arguments are `invalid_request`.
 
 ## 4. Error contract
 
@@ -199,7 +240,12 @@ Every non-2xx body:
 | `not_found` | 404 | Check the sref with `list_secrets`. | Do not guess srefs. |
 | `reason_required` | 400 | Repeat the call with a concrete `reason`. | Do not use a placeholder reason. |
 | `invalid_request` | 400 | Fix the request per `message`. | — |
-| `handoff_disabled` | 403 | Handoff links are off. Use a token. | — |
+| `handoff_disabled` | 403 | Handoff links are off. Use a token. | Do not ask the user to paste the secret. |
+| `unauthorized` | 401 | No or unrecognized credential. Tell the user to check the MCP/client configuration. | Do not guess a token. Do not ask the user to paste a secret or passphrase. |
+
+Human-surface codes, same shape: `bad_passphrase` (401), `forbidden_origin`
+(403), `unauthorized` (401), and `internal` (500, generic message, details in
+the daemon log only).
 
 The `do_not` column is the single most important text in this document. It is
 the difference between an agent that waits and an agent that asks the user to
@@ -220,8 +266,11 @@ paste an AWS key into a chat window.
 
 `POST /v1/sessions { scope: { paths, tags }, duration_seconds }` → `ses_…`.
 While a session is open, a read whose item is inside **both** the token's scope
-and the session's scope, and whose item is not `local-approval-only`, is
-recorded and released without an approval prompt. Sessions never renew; the
+and the session's scope is recorded and released without an approval prompt —
+including `local-approval-only` items, since the session was opened from the
+local UI. After an approval, a **grant** for that (token, item) lasts 30
+minutes or until the token expires, whichever is first (ADR 0005 §1,
+trust-on-first-use); reads under a grant do not prompt. Sessions never renew; the
 UI shows a countdown; `DELETE` ends one early. `duration_seconds` ≤ 28 800.
 
 ## 7. Versioning of this contract

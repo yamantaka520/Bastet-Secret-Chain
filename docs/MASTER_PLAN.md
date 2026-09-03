@@ -133,11 +133,15 @@ AI agent (token) ──loopback──────┘        │            ├�
 item        id, path (enc), name (enc), type, tags[], env, created, updated,
             expires_at, rotation_period, approval_required, current_version
 version     item_id, n, ciphertext, nonce, wrapped_dek, size, created, note
-reference   item_id, stable public ref id  ("sref_…"), created, revoked_at
-token       id, label, scope_paths[], scope_tags[], read_only, expires_at,
-            max_reads, reads_used, rate_limit, created_by, revoked_at
+(reference  collapsed in M2: the item id *is* the sref_ value)
+token       id, hash, label (enc), scope (enc), created, lifetime, expires_at,
+            max_lifetime_until, max_reads, reads_used, rate_limit, created_by,
+            revoked_at
+session     id, scope (enc), opened, expires_at, closed_at, opened_by
+grant       token_id, item_id, approval_id, expires_at
 audit       n, prev_hash, hash, ts, actor, action, subject, outcome, meta
-approval    item_id, token_id, requested_at, decided_at, decision, decided_by
+approval    id, token_id, item_id, reason, requested_at, expires_at, status,
+            decided_at, decided_by, consumed_at, escalation
 ```
 
 Hierarchy is a path (`prod/aws/billing-account`) plus orthogonal tags, so the
@@ -234,7 +238,7 @@ recorded in this repository and mirrored to BastetMind.
 | --- | --- | --- |
 | M0 | complete, 2026-09-03 | this repository at `2e3197b` and `0f33b25` |
 | M1 | complete, 2026-09-03 — 43 tests, three-platform CI run `33761893191` | [`M1_VALIDATION.md`](M1_VALIDATION.md) |
-| M2 | contract drafted, no code | [`API_CONTRACT.md`](API_CONTRACT.md) |
+| M2 | delivered locally, 2026-09-03; CI evidence pending | [`M2_VALIDATION.md`](M2_VALIDATION.md), [`API_CONTRACT.md`](API_CONTRACT.md) |
 | M3–M7 | not started | — |
 
 ## 7. Open questions

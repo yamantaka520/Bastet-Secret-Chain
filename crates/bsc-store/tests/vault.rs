@@ -89,7 +89,8 @@ fn put_read_roundtrip_and_detail() {
             "seed",
         )
         .unwrap();
-    assert!(id.starts_with("it_"));
+    assert!(id.starts_with("sref_"));
+    assert_eq!(id.len(), 5 + 22);
 
     let body = v.read(&id, &human(), "test").unwrap();
     assert_eq!(&*body, b"AKIA-not-real-0000");
@@ -314,12 +315,12 @@ fn reads_are_recorded_before_release_with_actor_and_reason() {
 fn missing_item_is_not_found() {
     let (_dir, mut v) = fresh();
     assert!(matches!(
-        v.read("it_nope", &human(), ""),
+        v.read("sref_nope", &human(), ""),
         Err(StoreError::NotFound)
     ));
-    assert!(matches!(v.meta("it_nope"), Err(StoreError::NotFound)));
+    assert!(matches!(v.meta("sref_nope"), Err(StoreError::NotFound)));
     assert!(matches!(
-        v.add_version("it_nope", b"x", None, &human(), ""),
+        v.add_version("sref_nope", b"x", None, &human(), ""),
         Err(StoreError::NotFound)
     ));
 }

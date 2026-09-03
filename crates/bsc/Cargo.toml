@@ -1,0 +1,29 @@
+[package]
+name = "bsc"
+description = "Bastet Secret Chain command line: init a vault, run the daemon, serve MCP, verify the ledger."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "bsc"
+path = "src/main.rs"
+
+[dependencies]
+bsc-crypto = { path = "../bsc-crypto" }
+bsc-daemon = { path = "../bsc-daemon" }
+bsc-mcp = { path = "../bsc-mcp" }
+bsc-store = { path = "../bsc-store" }
+clap.workspace = true
+hex.workspace = true
+rpassword.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+rusqlite.workspace = true
+tempfile.workspace = true

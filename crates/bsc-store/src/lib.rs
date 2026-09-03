@@ -17,6 +17,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod access;
 pub mod audit;
 mod error;
 pub mod model;
@@ -24,4 +25,4 @@ mod schema;
 mod vault;
 
 pub use error::{Result, StoreError};
-pub use vault::{Actor, Vault};
+pub use vault::{Actor, Clock, Vault};
