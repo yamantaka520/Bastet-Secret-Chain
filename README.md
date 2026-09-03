@@ -7,7 +7,7 @@ without the secret ever living in a URL, a prompt, or a shell history.**
 Humans put credentials in through a Web UI. Agents take them out through an
 authenticated reference. Every retrieval is appended to a tamper-evident chain.
 
-> **Status: M1 delivered locally; M2 contract drafted.**
+> **Status: M1 complete; M2 contract drafted.**
 > `bsc-crypto` and `bsc-store` implement the envelope encryption, sealed
 > SQLite vault, blind index, and hash-chained ledger with 43 passing tests.
 > There is no daemon, API, MCP server, or UI yet — their shape is fixed in

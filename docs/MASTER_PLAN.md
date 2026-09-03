@@ -233,7 +233,7 @@ recorded in this repository and mirrored to BastetMind.
 | Milestone | State | Evidence |
 | --- | --- | --- |
 | M0 | complete, 2026-09-03 | this repository at `2e3197b` and `0f33b25` |
-| M1 | delivered locally, 2026-09-03; CI evidence pending | [`M1_VALIDATION.md`](M1_VALIDATION.md) |
+| M1 | complete, 2026-09-03 — 43 tests, three-platform CI run `33761893191` | [`M1_VALIDATION.md`](M1_VALIDATION.md) |
 | M2 | contract drafted, no code | [`API_CONTRACT.md`](API_CONTRACT.md) |
 | M3–M7 | not started | — |
 

@@ -3,8 +3,8 @@
 **Milestone:** M1 from [`MASTER_PLAN.md`](MASTER_PLAN.md) §6.
 **Gate text:** Argon2id/XChaCha20 envelope, SQLite WAL schema, seal/unseal,
 zeroization; property tests + known-answer vectors.
-**Status:** delivered locally on 2026-09-03; three-platform CI evidence is
-recorded below as it arrives. Nothing here is a release.
+**Status:** gate met, 2026-09-03 — local evidence plus three-platform CI on
+commit `de31995`. Nothing here is a release.
 
 ## What was built
 
@@ -103,6 +103,11 @@ anchored outside the vault (ADR 0004, scheduled for M6).
 
 ## CI evidence
 
-| Run | Ubuntu | macOS | Windows | Hygiene |
-| --- | --- | --- | --- | --- |
-| _pending first push_ | — | — | — | — |
+| Run | Commit | Ubuntu | macOS | Windows | Hygiene |
+| --- | --- | --- | --- | --- | --- |
+| [`33761893191`](https://github.com/yamantaka520/Bastet-Secret-Chain/actions/runs/33761893191) | `de31995` | ✅ | ✅ | ✅ | ✅ |
+
+Each Rust job ran `cargo fmt --check`, `cargo clippy --all-targets --locked
+-D warnings`, `cargo test --workspace --locked`, and the known-answer
+regeneration check. The only annotations were the runner's Node.js 20
+deprecation notice for `actions/checkout@v4`, since bumped to `v5`.

@@ -62,5 +62,6 @@ release exists. Until then every change lands under `Unreleased`.
 
 ### Status
 
-- M1 delivered locally on 2026-09-03 with 43 passing tests; three-platform CI
-  evidence pending first run. M2 has a contract but no code. No release.
+- M1 gate met on 2026-09-03: 43 passing tests locally and on Ubuntu, macOS,
+  and Windows (CI run `33761893191`). M2 has a contract but no code. No
+  release.
