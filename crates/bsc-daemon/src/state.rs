@@ -47,6 +47,10 @@ pub struct Config {
     /// Failed unseal/login attempts allowed per client address per 10 minutes
     /// before further attempts are refused for the rest of the window.
     pub login_attempts_per_10m: u32,
+    /// Where the passphrase came from at startup, when the operator opted into
+    /// unattended unseal (`"systemd-credential"`, `"macos-keychain"`). `None`
+    /// means the vault waits for a human. Shown in `/v1/vault/status`.
+    pub unattended_unseal: Option<String>,
 }
 
 impl Default for Config {
@@ -65,6 +69,7 @@ impl Default for Config {
             poll_interval: 5,
             public_origin: None,
             login_attempts_per_10m: 5,
+            unattended_unseal: None,
         }
     }
 }

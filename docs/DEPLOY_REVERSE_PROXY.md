@@ -83,6 +83,21 @@ nginx`, and from anywhere: `bsc doctor --url https://sec.bastet.tw` (the vault
 checks are skipped when the file is not local; the daemon, UI, bind, and
 clock checks still run).
 
+### Unattended unseal (added the same day)
+
+A server that restarts into a sealed vault is a server nobody can use until
+someone opens the UI. `deploy/bsc-unattended.conf` is a drop-in that stores
+the passphrase as a **systemd encrypted credential** (TPM2-sealed where the
+host has one, otherwise sealed to the root-only host key) and passes it to the
+daemon at start via `LoadCredentialEncrypted`; the daemon reads
+`$CREDENTIALS_DIRECTORY/bsc-passphrase`, unseals, zeroizes, and writes
+`unseal_unattended` (source `systemd-credential`) to the ledger. The operator
+creates the credential once by typing the passphrase into
+`systemd-creds encrypt` — it is never on a command line or in a file in the
+clear. The trade is stated in the drop-in: root on the host can now decrypt,
+so the vault is as private as the host. A wrong credential makes the unit
+fail rather than start sealed, so a broken deployment is loud.
+
 Why a **system** unit rather than `bsc service install`: the latter writes a
 user unit, which on a server would need `loginctl enable-linger` and would
 run as an interactive account. A dedicated `bsc` user with `ProtectSystem=

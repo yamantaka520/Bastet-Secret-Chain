@@ -52,6 +52,17 @@ enum Cmd {
         /// address, and writes exposure_acknowledged to the ledger.
         #[arg(long)]
         public_origin: Option<String>,
+        /// Unseal at startup from a systemd encrypted credential of this name
+        /// (`LoadCredentialEncrypted=<name>:…` in the unit; the file appears at
+        /// `$CREDENTIALS_DIRECTORY/<name>`). Opt-in unattended unseal for
+        /// servers. Recorded in the ledger as `unseal_unattended`.
+        #[arg(long, conflicts_with = "unseal_keychain")]
+        unseal_credential: Option<String>,
+        /// Unseal at startup from the macOS Keychain generic-password item with
+        /// this service name (`security add-generic-password -s <name> -a bsc
+        /// -w`). Opt-in unattended unseal for a workstation LaunchAgent.
+        #[arg(long)]
+        unseal_keychain: Option<String>,
     },
     /// Serve MCP over stdio as a client of a running daemon.
     Mcp {
@@ -122,6 +133,58 @@ fn default_vault() -> PathBuf {
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".bsc")))
         .unwrap_or_else(|| PathBuf::from(".bsc"));
     base.join("vault.bsc")
+}
+
+/// Opt-in unattended unseal. Returns the source label on success, `None` when
+/// neither option was given. A configured source that fails is an error —
+/// starting sealed and silently waiting would hide a broken deployment.
+fn unattended_unseal(
+    v: &mut Vault,
+    credential: Option<&str>,
+    keychain: Option<&str>,
+) -> Result<Option<String>, String> {
+    let (pw, source): (Zeroizing<Vec<u8>>, &str) = if let Some(name) = credential {
+        let dir = std::env::var_os("CREDENTIALS_DIRECTORY").ok_or(
+            "--unseal-credential given but CREDENTIALS_DIRECTORY is not set; is this running under systemd with LoadCredential(Encrypted)?",
+        )?;
+        let path = PathBuf::from(dir).join(name);
+        let bytes =
+            std::fs::read(&path).map_err(|e| format!("credential {}: {e}", path.display()))?;
+        (Zeroizing::new(trim_newline(bytes)), "systemd-credential")
+    } else if let Some(service) = keychain {
+        if !cfg!(target_os = "macos") {
+            return Err("--unseal-keychain is only available on macOS".into());
+        }
+        let out = std::process::Command::new("security")
+            .args(["find-generic-password", "-s", service, "-a", "bsc", "-w"])
+            .output()
+            .map_err(|e| format!("security: {e}"))?;
+        if !out.status.success() {
+            return Err(format!(
+                "keychain item {service:?} (account bsc) not found or not readable: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            ));
+        }
+        (Zeroizing::new(trim_newline(out.stdout)), "macos-keychain")
+    } else {
+        return Ok(None);
+    };
+    if pw.is_empty() {
+        return Err(format!(
+            "unattended unseal source {source} yielded an empty passphrase"
+        ));
+    }
+    v.unseal_unattended(&pw, source)
+        .map_err(|e| format!("unattended unseal from {source} failed: {e}"))?;
+    tracing::warn!(source, "vault unsealed unattended at startup");
+    Ok(Some(source.to_string()))
+}
+
+fn trim_newline(mut b: Vec<u8>) -> Vec<u8> {
+    while matches!(b.last(), Some(b'\n' | b'\r')) {
+        b.pop();
+    }
+    b
 }
 
 fn prompt_passphrase(confirm: bool) -> Result<Zeroizing<String>, String> {
@@ -201,8 +264,15 @@ fn run() -> Result<(), String> {
             vault,
             bind,
             public_origin,
+            unseal_credential,
+            unseal_keychain,
         } => {
-            let v = Vault::open(&vault).map_err(|e| format!("{}: {e}", vault.display()))?;
+            let mut v = Vault::open(&vault).map_err(|e| format!("{}: {e}", vault.display()))?;
+            let unattended = unattended_unseal(
+                &mut v,
+                unseal_credential.as_deref(),
+                unseal_keychain.as_deref(),
+            )?;
             if let Some(o) = &public_origin {
                 let bare = o.trim_end_matches('/');
                 let scheme_ok = bare.starts_with("https://") || bare.starts_with("http://");
@@ -222,6 +292,7 @@ fn run() -> Result<(), String> {
             let notifier = std::sync::Arc::new(bsc_daemon::notify::OsNotifier { ui_url });
             let config = bsc_daemon::Config {
                 public_origin: public_origin.map(|o| o.trim_end_matches('/').to_string()),
+                unattended_unseal: unattended,
                 ..bsc_daemon::Config::default()
             };
             let state = bsc_daemon::AppState::new_with_notifier(v, config, notifier);

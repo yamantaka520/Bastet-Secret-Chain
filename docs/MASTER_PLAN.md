@@ -122,9 +122,14 @@ AI agent (token) ──loopback──────┘        │            ├�
   revealing names in the file. Timestamps, sizes, and types stay clear so the
   UI can list a sealed vault's shape without unsealing it.
 - **Sealed/unsealed:** the vault boots sealed. Unseal by passphrase in the UI,
-  or from the OS keychain (macOS Keychain, Windows DPAPI, Linux Secret Service)
-  when the operator has opted into unattended start. Auto-reseal on idle
-  timeout, on explicit lock, and on suspend where the OS reports it.
+  or — when the operator has opted in — unattended at start: from a systemd
+  encrypted credential (`--unseal-credential`, servers) or the macOS Keychain
+  (`--unseal-keychain`, LaunchAgents). *Implemented 2026-09-04 (M6 step 1);
+  Windows DPAPI and Linux Secret Service are not.* Each such unseal is a
+  ledger record `unseal_unattended` naming its source; a source that fails
+  refuses to start rather than waiting sealed and silent. Auto-reseal on idle
+  timeout, on explicit lock, and on suspend where the OS reports it — *not yet
+  implemented*.
 - **Zeroization:** all key material and plaintext buffers use zeroizing types.
 
 ### 4.3 Data model

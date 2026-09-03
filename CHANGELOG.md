@@ -142,6 +142,13 @@ release exists. Until then every change lands under `Unreleased`.
   `approval_pending`, waited in `check_access` while a human approved, and
   answered with only the requested field.
 
+- **M6 step 1 — unattended unseal (opt-in)**: `bsc serve --unseal-credential
+  <name>` reads a systemd encrypted credential from `$CREDENTIALS_DIRECTORY`;
+  `--unseal-keychain <service>` reads a macOS Keychain generic password. A
+  successful unseal is recorded as `unseal_unattended` with its source and
+  shown in `/v1/vault/status`; a failing source refuses to start.
+  `deploy/bsc-unattended.conf` is the server drop-in.
+
 ### Status
 
 - M5 gate met on 2026-09-04 with Codex CLI and then Claude Code; Agy and

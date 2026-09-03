@@ -160,6 +160,7 @@ pub async fn status(State(state): State<Arc<AppState>>, headers: HeaderMap) -> R
         "version": env!("CARGO_PKG_VERSION"),
         "uptime": state.uptime(),
         "public_origin": state.config.public_origin,
+        "unattended_unseal": state.config.unattended_unseal,
     });
     if auth::human(&state, &headers, false).is_ok() {
         let chain = match v.audit_verify()? {

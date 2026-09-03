@@ -274,6 +274,29 @@ impl Vault {
         Ok(())
     }
 
+    /// Unseal from a passphrase that was supplied by a machine (systemd
+    /// credential, OS keychain) rather than typed. Same verification as
+    /// [`Vault::unseal`], but the ledger records *where the passphrase came
+    /// from*, because an unattended unseal is a standing decision the operator
+    /// made and should be able to see in the chain.
+    pub fn unseal_unattended(&mut self, passphrase: &[u8], source: &str) -> Result<()> {
+        let kek = Kek::derive(passphrase, &self.params)?;
+        let ok = envelope::check_verifier(&kek, &self.verifier);
+        self.audit_now(
+            &Actor::System,
+            "unseal_unattended",
+            None,
+            if ok { "ok" } else { "denied" },
+            serde_json::json!({ "source": source }),
+        )?;
+        if !ok {
+            return Err(StoreError::BadPassphrase);
+        }
+        let index = IndexKey::derive(&kek);
+        self.state = State::Unsealed { kek, index };
+        Ok(())
+    }
+
     /// Check a passphrase against the header without changing seal state.
     /// Used for login to an already-unsealed vault and for re-authentication
     /// before revealing approval-required items. Both outcomes are recorded
