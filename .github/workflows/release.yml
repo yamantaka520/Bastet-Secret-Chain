@@ -1,0 +1,64 @@
+name: Release
+
+# Dormant until a tag is pushed. Builds the same artifacts CI builds on every
+# push, attaches them plus SHA256SUMS to a GitHub Release, and generates build
+# provenance attestations. Signing with a project key is M7.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,  target: x86_64-unknown-linux-gnu,  ext: "" }
+          - { os: macos-latest,   target: aarch64-apple-darwin,      ext: "" }
+          - { os: macos-13,       target: x86_64-apple-darwin,       ext: "" }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc,    ext: ".exe" }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22 }
+      - run: npm --prefix ui ci && npm --prefix ui run build
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "${{ matrix.target }}" }
+      - run: cargo build --release --locked -p bsc --target ${{ matrix.target }}
+      - name: Package
+        shell: bash
+        run: |
+          set -e
+          V="${GITHUB_REF_NAME#v}"
+          NAME="bsc-${V}-${{ matrix.target }}"
+          mkdir -p "dist/$NAME"
+          cp "target/${{ matrix.target }}/release/bsc${{ matrix.ext }}" README.md LICENSE NOTICE "dist/$NAME/"
+          cd dist
+          if [ "${{ runner.os }}" = "Windows" ]; then 7z a -tzip "$NAME.zip" "$NAME" > /dev/null; else tar czf "$NAME.tar.gz" "$NAME"; fi
+          rm -rf "$NAME"
+      - uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "dist/*"
+      - uses: actions/upload-artifact@v4
+        with: { name: "bsc-${{ matrix.target }}", path: "dist/*" }
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - name: SHA256SUMS
+        run: cd dist && sha256sum bsc-* > SHA256SUMS && cat SHA256SUMS
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          draft: true

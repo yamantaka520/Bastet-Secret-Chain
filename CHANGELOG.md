@@ -98,8 +98,25 @@ release exists. Until then every change lands under `Unreleased`.
 - `docs/M3_VALIDATION.md`, including the recorded manual browser pass and
   the stated e2e substitution.
 
+- **M4 — `bsc service install|uninstall|status`**: launchd LaunchAgent,
+  systemd user unit, or Task Scheduler logon task, user-level and unelevated,
+  with `--dry-run`; definitions are unit-tested for every platform.
+- **M4 — `bsc doctor`**: ✅/⚠️/❌ checklist over file permissions, header,
+  audit chain, writability, loopback, daemon, UI, auto-start, notifications,
+  clock; non-zero exit only on ❌.
+- **M4 — CI**: release artifacts for Linux/macOS/Windows with the UI embedded,
+  `.sha256`, unpacked-archive smoke test, uploaded on every push; `plutil
+  -lint` and `systemd-analyze verify` on generated definitions; dormant
+  tag-triggered `release.yml` with `SHA256SUMS`, provenance attestations, and
+  a draft GitHub Release; `scripts/install.sh` and `install.ps1` with checksum
+  verification.
+- `docs/M4_VALIDATION.md`, which states that the reboot survival test was not
+  performed on any platform.
+
 ### Status
 
+- M4 partially delivered on 2026-09-04 with 95 passing tests; CI evidence
+  pending; reboot survival untested. No tag, no release.
 - M3 gate met on 2026-09-03: 82 passing tests locally and on Ubuntu, macOS,
   and Windows with the UI built and embedded (CI run `33769473982`). M4
   (packaging and auto-start) not started. No release.

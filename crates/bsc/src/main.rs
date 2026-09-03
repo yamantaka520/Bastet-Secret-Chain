@@ -5,9 +5,14 @@
 //! bsc serve  --vault PATH [--bind]   run the daemon, sealed, on loopback
 //! bsc mcp    [--url] [--token-file]  MCP stdio server; token from file or BSC_TOKEN
 //! bsc audit  --vault PATH            verify the ledger offline
+//! bsc service install|uninstall|status [--vault] [--bind] [--dry-run]
+//! bsc doctor [--vault] [--url]        checklist: file, ledger, daemon, UI, auto-start, clock
 //! ```
 
 #![forbid(unsafe_code)]
+
+mod doctor;
+mod service;
 
 use std::{net::SocketAddr, path::PathBuf, process::ExitCode};
 
@@ -54,6 +59,51 @@ enum Cmd {
     Audit {
         #[arg(long, default_value_os_t = default_vault())]
         vault: PathBuf,
+    },
+    /// Start the daemon at login through launchd, systemd --user, or Task Scheduler.
+    Service {
+        #[command(subcommand)]
+        action: ServiceCmd,
+    },
+    /// Check the installation and print a ✅/⚠️/❌ checklist.
+    Doctor {
+        #[arg(long, default_value_os_t = default_vault())]
+        vault: PathBuf,
+        #[arg(long, default_value = "http://127.0.0.1:8787")]
+        url: String,
+        /// Bind the auto-start check assumes, if a service is installed.
+        #[arg(long, default_value = "127.0.0.1:8787")]
+        bind: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ServiceCmd {
+    /// Write the definition and start the daemon now and at every login.
+    Install {
+        #[arg(long, default_value_os_t = default_vault())]
+        vault: PathBuf,
+        #[arg(long, default_value = "127.0.0.1:8787")]
+        bind: String,
+        /// Print the definition and the commands without touching the system.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Stop the daemon and remove the definition. The vault is untouched.
+    Uninstall {
+        #[arg(long, default_value_os_t = default_vault())]
+        vault: PathBuf,
+        #[arg(long, default_value = "127.0.0.1:8787")]
+        bind: String,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Ask the supervisor what it knows about the daemon.
+    Status {
+        #[arg(long, default_value_os_t = default_vault())]
+        vault: PathBuf,
+        #[arg(long, default_value = "127.0.0.1:8787")]
+        bind: String,
     },
 }
 
@@ -173,6 +223,40 @@ fn run() -> Result<(), String> {
             let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
             rt.block_on(bsc_mcp::McpServer::new(url, token.as_str()).run_stdio())
                 .map_err(|e| e.to_string())
+        }
+        Cmd::Service { action } => match action {
+            ServiceCmd::Install {
+                vault,
+                bind,
+                dry_run,
+            } => {
+                let spec = service::spec_for_current(&vault, &bind)?;
+                print!("{}", service::install(&spec, dry_run)?);
+                Ok(())
+            }
+            ServiceCmd::Uninstall {
+                vault,
+                bind,
+                dry_run,
+            } => {
+                let spec = service::spec_for_current(&vault, &bind)?;
+                print!("{}", service::uninstall(&spec, dry_run)?);
+                Ok(())
+            }
+            ServiceCmd::Status { vault, bind } => {
+                let spec = service::spec_for_current(&vault, &bind)?;
+                print!("{}", service::status(&spec)?);
+                Ok(())
+            }
+        },
+        Cmd::Doctor { vault, url, bind } => {
+            let spec = service::spec_for_current(&vault, &bind).ok();
+            let report = doctor::run(&vault, url.trim_end_matches('/'), spec.as_ref());
+            print!("{report}");
+            match report.worst() {
+                doctor::Level::Fail => Err("one or more checks failed".into()),
+                _ => Ok(()),
+            }
         }
         Cmd::Audit { vault } => {
             let v = Vault::open(&vault).map_err(|e| format!("{}: {e}", vault.display()))?;

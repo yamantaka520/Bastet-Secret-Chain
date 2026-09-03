@@ -180,6 +180,10 @@ same item can live in one place and still be found many ways.
 - `bsc doctor` verifies bind address, file permissions (`0600` vault,
   `0700` directory), service state, keychain availability, and clock sanity.
 - Uninstall removes the service and leaves the vault untouched by default.
+- Implemented in M4 as launchd LaunchAgent / systemd user unit / Task
+  Scheduler logon task, all without elevation; SCM service and installer
+  packages are later decisions. Windows note: the logon task runs only when
+  the user logs in, like the other two.
 
 ### 4.6 Agent interface
 
@@ -240,7 +244,8 @@ recorded in this repository and mirrored to BastetMind.
 | M1 | complete, 2026-09-03 — 43 tests, three-platform CI run `33761893191` | [`M1_VALIDATION.md`](M1_VALIDATION.md) |
 | M2 | complete, 2026-09-03 — 79 tests, three-platform CI run `33766212364` | [`M2_VALIDATION.md`](M2_VALIDATION.md), [`API_CONTRACT.md`](API_CONTRACT.md) |
 | M3 | complete, 2026-09-03 — 82 tests, three-platform CI run `33769473982`; e2e gate met by an API-level substitute plus a recorded manual browser pass | [`M3_VALIDATION.md`](M3_VALIDATION.md) |
-| M4–M7 | not started | — |
+| M4 | partially delivered, 2026-09-04 — artifacts, `service install`, `doctor`, CI on three platforms; **reboot survival untested on every platform** | [`M4_VALIDATION.md`](M4_VALIDATION.md) |
+| M5–M7 | not started | — |
 
 ## 7. Open questions
 

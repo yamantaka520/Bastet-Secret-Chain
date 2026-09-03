@@ -34,6 +34,15 @@ out of scope in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
 - Never paste a secret into an agent prompt. Give the agent a reference and a
   token instead.
 
+## Installing
+
+Release archives are verified by `scripts/install.sh` / `install.ps1` against
+the `SHA256SUMS` published with the same release. That proves the archive is
+the one the release job produced, not that the release job was the
+maintainer's — signed releases are scheduled for M7. Prefer building from
+source until then, and never pipe an install script from the network into a
+shell without reading it.
+
 ## Never in this repository
 
 Vault databases, key material, exported secrets, service-account JSON, OAuth

@@ -50,6 +50,100 @@ jobs:
           grep -q 'tag(name, "aws") = fe9529c8e2ef072a16d78d5f90152e0b' vectors.txt
           grep -q 'tag(path, "prod") = 4651110e1415ddfe20eaaaa2a015e998' vectors.txt
 
+      - name: Lint the launchd definition (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          mkdir -p /tmp/bschome
+          cargo run -q -p bsc -- init --passphrase-stdin --vault /tmp/bschome/v.bsc <<< "ci-passphrase"
+          HOME=/tmp/bschome cargo run -q -p bsc -- service install --dry-run --vault /tmp/bschome/v.bsc \
+            | sed -n '/<?xml/,/<\/plist>/p' | sed 's/^      //' > /tmp/bsc.plist
+          plutil -lint /tmp/bsc.plist
+      - name: Verify the systemd unit (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p /tmp/bschome/.config/systemd/user
+          cargo run -q -p bsc -- init --passphrase-stdin --vault /tmp/bschome/v.bsc <<< "ci-passphrase"
+          HOME=/tmp/bschome cargo run -q -p bsc -- service install --dry-run --vault /tmp/bschome/v.bsc \
+            | sed -n '/^      \[Unit\]/,/WantedBy/p' | sed 's/^      //' > /tmp/bschome/.config/systemd/user/bsc.service
+          cat /tmp/bschome/.config/systemd/user/bsc.service
+          systemd-analyze --user verify /tmp/bschome/.config/systemd/user/bsc.service || systemd-analyze verify /tmp/bschome/.config/systemd/user/bsc.service
+      - name: Doctor on a fresh vault
+        shell: bash
+        run: |
+          cargo run -q -p bsc -- doctor --vault /tmp/bschome/v.bsc --url http://127.0.0.1:1 || true
+
+  artifacts:
+    name: Release artifact (${{ matrix.target }})
+    needs: rust
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: ""
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ext: ""
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: ".exe"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm --prefix ui ci && npm --prefix ui run build
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --release --locked -p bsc --target ${{ matrix.target }}
+      - name: Package
+        shell: bash
+        run: |
+          set -e
+          V=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)"/\1/')
+          NAME="bsc-${V}-${{ matrix.target }}"
+          mkdir -p "dist/$NAME"
+          cp "target/${{ matrix.target }}/release/bsc${{ matrix.ext }}" "dist/$NAME/"
+          cp README.md LICENSE NOTICE "dist/$NAME/"
+          cd dist
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            7z a -tzip "$NAME.zip" "$NAME" > /dev/null
+            sha256sum "$NAME.zip" > "$NAME.zip.sha256"
+          else
+            tar czf "$NAME.tar.gz" "$NAME"
+            shasum -a 256 "$NAME.tar.gz" > "$NAME.tar.gz.sha256"
+          fi
+          rm -rf "$NAME"
+          ls -la
+      - name: Smoke the packaged binary
+        shell: bash
+        run: |
+          set -e
+          cd dist
+          f=$(ls bsc-*.tar.gz bsc-*.zip 2>/dev/null | head -1)
+          if [[ "$f" == *.zip ]]; then 7z x "$f" > /dev/null; else tar xzf "$f"; fi
+          d=$(ls -d bsc-*/ | head -1)
+          "$d/bsc${{ matrix.ext }}" --version
+          echo "ci-passphrase" | "$d/bsc${{ matrix.ext }}" init --passphrase-stdin --vault ./smoke.bsc
+          "$d/bsc${{ matrix.ext }}" audit --vault ./smoke.bsc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bsc-${{ matrix.target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+
   secrets-hygiene:
     name: No secret material in tree
     runs-on: ubuntu-latest

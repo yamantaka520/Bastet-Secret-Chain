@@ -7,12 +7,14 @@ without the secret ever living in a URL, a prompt, or a shell history.**
 Humans put credentials in through a Web UI. Agents take them out through an
 authenticated reference. Every retrieval is appended to a tamper-evident chain.
 
-> **Status: M3 delivered — the Web UI is in.** `bsc serve` hosts the
+> **Status: M4 in progress — packaging and auto-start.** `bsc serve` hosts the
 > operator UI at `http://127.0.0.1:8787/` and the `/v1` API; `bsc mcp` gives
 > an agent five read-only tools; every read is scoped, quota'd, audited, and —
 > for high-value items — held for human approval in the inbox. 82 passing
-> tests. Evidence and explicit gaps: [`docs/M3_VALIDATION.md`](docs/M3_VALIDATION.md).
-> Packaging and boot auto-start are M4.
+> tests. `bsc service install` starts the daemon at login; `bsc doctor` checks
+> the installation. Release archives are built on every push; there is **no
+> tagged release yet** and the boot-survival test has not been run on a real
+> machine. Evidence and gaps: [`docs/M4_VALIDATION.md`](docs/M4_VALIDATION.md).
 
 ## What it stores
 
@@ -73,6 +75,7 @@ not follow them there.
 | [`docs/M1_VALIDATION.md`](docs/M1_VALIDATION.md) | M1 test evidence and what is explicitly not done |
 | [`docs/M2_VALIDATION.md`](docs/M2_VALIDATION.md) | M2 evidence: the error-contract and MCP-parity gate tests, explicit gaps |
 | [`docs/M3_VALIDATION.md`](docs/M3_VALIDATION.md) | M3 evidence: all-types round trip, served-UI test, recorded browser pass, the e2e substitution |
+| [`docs/M4_VALIDATION.md`](docs/M4_VALIDATION.md) | M4 evidence: service definitions, doctor, artifacts; the reboot test that was not run |
 | [`docs/adr/`](docs/adr) | Architecture decision records 0001–0006 |
 | [`CHANGELOG.md`](CHANGELOG.md) | History of changes |
 
@@ -80,17 +83,37 @@ not follow them there.
 
 M0 baseline → M1 crypto core → M2 daemon API, tokens, audit chain, MCP server →
 M3 Web UI (done) →
+M4 packaging and auto-start (artifacts, service, doctor done; reboot test pending) →
 M4 packaging and auto-start → M5 agent integration → M6 rotation, delegation,
 external approval → M7 hardening and first release. Gates are defined in the master
 plan; nothing is claimed done until its gate is met.
+
+## Installing
+
+There is no tagged release yet. Until there is, build from source:
+
+```sh
+npm --prefix ui ci && npm --prefix ui run build
+cargo install --path crates/bsc --locked
+```
+
+Once a release exists, `scripts/install.sh vX.Y.Z` (macOS/Linux) and
+`scripts/install.ps1 -Version vX.Y.Z` (Windows) download the archive and
+verify it against the release's `SHA256SUMS`. Read them before running them;
+they are not meant to be piped from the network into a shell.
 
 ## Running it today
 
 ```sh
 bsc init                      # creates ~/.bsc/vault.bsc, prompts for a passphrase
-bsc serve                     # UI + API at http://127.0.0.1:8787, starts sealed
+bsc service install           # start now and at every login (launchd / systemd --user / Task Scheduler)
+bsc doctor                    # ✅/⚠️/❌ checklist: permissions, ledger, daemon, UI, auto-start, clock
+bsc serve                     # or run it in the foreground instead of installing the service
 bsc audit                     # verify the ledger offline
 ```
+
+`bsc service install --dry-run` prints the definition and the commands without
+touching anything.
 
 Open `http://127.0.0.1:8787/`, unseal, and work in the UI. The same things
 are reachable over the human API:

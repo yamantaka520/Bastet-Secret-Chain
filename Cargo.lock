@@ -237,14 +237,17 @@ dependencies = [
 name = "bsc"
 version = "0.0.0"
 dependencies = [
+ "axum",
  "bsc-crypto",
  "bsc-daemon",
  "bsc-mcp",
  "bsc-store",
  "clap",
  "hex",
+ "reqwest",
  "rpassword",
  "rusqlite",
+ "serde_json",
  "tempfile",
  "tokio",
  "tracing",
