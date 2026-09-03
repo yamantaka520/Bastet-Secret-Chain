@@ -1,8 +1,15 @@
-# Bastet Secret Chain 🔐⛓️
+# 🐈 Bastet Secret Chain
+
+[![version](https://img.shields.io/github/v/tag/yamantaka520/Bastet-Secret-Chain?label=version&color=orange)](https://github.com/yamantaka520/Bastet-Secret-Chain/releases)
+[![rust](https://img.shields.io/badge/rust-stable-blue)](https://www.rust-lang.org)
+[![CI](https://img.shields.io/github/actions/workflow/status/yamantaka520/Bastet-Secret-Chain/ci.yml?branch=main&label=CI)](https://github.com/yamantaka520/Bastet-Secret-Chain/actions/workflows/ci.yml)
+[![platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-informational)](docs/manual/en/install.md)
+[![MCP](https://img.shields.io/badge/MCP-ready-8A2BE2)](docs/manual/en/agents.md)
+[![license](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
 **📖 Manuals:** [繁體中文](docs/manual/zh-Hant/guide.md) · [简体中文](docs/manual/zh-Hans/guide.md) · [English](docs/manual/en/guide.md) · [日本語](docs/manual/ja/guide.md) · [한국어](docs/manual/ko/guide.md) — [all manuals](docs/manual/)
 
-A local-first, self-hosted vault for sensitive credentials — built so that **AI
+🔐⛓️ A local-first, self-hosted vault for sensitive credentials — built so that **AI
 agents can fetch exactly the secret they need, at the moment they need it,
 without the secret ever living in a URL, a prompt, or a shell history.**
 

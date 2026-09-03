@@ -149,7 +149,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now bsc
 systemctl status bsc
 ```
 
-把 unit 里的 `--bind` 与 `--public-origin` 改成你的端口与域名。`--public-origin https://secrets.example.com` 是在告诉服务「前面有一台 TLS 代理」：它会接受该 Origin、把 session cookie 标成 `Secure`、按转发来的客户端地址限流登录，并在审计链写下 `exposure_acknowledged`。没有这个参数，远程浏览器一律被拒。
+把 unit 里的 `--bind` 与 `--public-origin` 改成你的端口与域名。`--public-origin https://secrets.example.com` 是在告诉服务“前面有一台 TLS 代理”：它会接受该 Origin、把 session cookie 标成 `Secure`、按转发来的客户端地址限流登录，并在审计链写下 `exposure_acknowledged`。没有这个参数，远程浏览器一律被拒。
 
 ### 4.3 nginx 与 TLS
 
@@ -157,7 +157,7 @@ systemctl status bsc
 
 - 一张真证书，HTTP 跳转到 HTTPS；
 - `proxy_pass http://127.0.0.1:8787;`，并用真正的客户端地址填 `X-Forwarded-For`（在 Cloudflare 后面就用 `CF-Connecting-IP`）；
-- 对 `/v1/vault/unseal` 与 `/v1/items` 设 `limit_req`，让被盗的 session 没办法透过代理被暴力尝试。
+- 对 `/v1/vault/unseal` 与 `/v1/items` 设 `limit_req`，让被盗的 session 没办法通过代理被暴力尝试。
 
 然后从你自己的机器检查：
 
@@ -188,7 +188,7 @@ curl -s http://127.0.0.1:8787/v1/vault/status
 
 ### 4.5 Telegram 审批通道（可选）
 
-当 Agent 要读高价值敏感数据而你人不在机器前，服务可以发出一条带「批准／拒绝」按钮的消息。它只对外连接——不开任何 inbound 端口、不用 webhook——消息里不会有敏感数据内容，也不会有任何按下去就能取得敏感数据的链接。
+当 Agent 要读高价值敏感数据而你人不在机器前，服务可以发出一条带“批准／拒绝”按钮的消息。它只对外连接——不开任何 inbound 端口、不用 webhook——消息里不会有敏感数据内容，也不会有任何按下去就能取得敏感数据的链接。
 
 在**服务器上**运行 [`deploy/telegram-setup.sh`](../../../deploy/telegram-setup.sh)；bot token 在那里输入，不会离开主机：
 
@@ -251,6 +251,6 @@ sudo bsc audit --vault /var/lib/bsc/vault.bsc     # 审计链完整
 
 1. 口令由人输入，只输入到终端或 UI。永远不要进到对话、脚本、工单或仓库。
 2. Agent 拿到的是 **token**，不是口令；token 也不要贴进提示词。它该待在配置文件里。
-3. 服务待在 loopback。对外开放只能透过你刻意配置的反向代理。
+3. 服务待在 loopback。对外开放只能通过你刻意配置的反向代理。
 4. 备份保险库文件，而且至少留一份在这台机器之外。
 5. 保险库、导出文件、token、锚定文件，一律不得提交进仓库。这个 repo 只放源码与文档。

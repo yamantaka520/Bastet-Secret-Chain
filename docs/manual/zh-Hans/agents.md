@@ -11,7 +11,7 @@
 ## 1. 正确的接入长什么样
 
 1. 由**人类**在 UI 签发一把有范围、有期限的 token，放进 Agent 的**配置文件**——不是提示词、不是仓库、不是 URL。
-2. Agent 透过 **MCP server** 访问保险库，不是用 `curl`。
+2. Agent 通过 **MCP server** 访问保险库，不是用 `curl`。
 3. Agent 的指令明白要求：给出真实理由、遇到等待就等、永远不要叫人把敏感数据贴过来。
 4. 人类在审计链看得到每一次读取，高价值的读取还会先进审批收件箱。
 
@@ -70,7 +70,7 @@ args = ["mcp", "--url", "http://127.0.0.1:8787", "--token-file", "/home/you/.bsc
 | `use_secret` | `sref`、`reason`、`url`、`method?`、`headers?`、`body?` | 上游服务的响应。凭据由服务注入，永远不会到 Agent 手上。 |
 | `renew_access` | 无 | 把调用端 token 的到期时间往后延。永远不会扩大范围。 |
 
-`reason` 是必填，而且会写进审计链。「用 commit abc123 部署 staging」是理由，「执行任务」不是。
+`reason` 是必填，而且会写进审计链。“用 commit abc123 部署 staging”是理由，“执行任务”不是。
 
 ---
 
@@ -133,11 +133,11 @@ curl -fsS -H "Authorization: Bearer $BSC_TOKEN" \
 
 | Agent 说 | 代表 | 你该做 |
 | --- | --- | --- |
-| 「unauthorized」 | token 不被认得 | 检查 `BSC_TOKEN`、`--token-file`、网址 |
-| 「token_expired, renewable: false」 | 已过续期窗口 | 到 UI 签发一把新的 |
-| 「scope_mismatch」 | 保险库对了，token 不对 | 放宽范围，或为该路径签发一把 |
-| 「approval_pending」很久 | 没有人审批 | 打开收件箱；下次考虑先开任务窗口 |
-| 「vault_sealed」 | 服务重启过 | 到 UI 解封。绝不能让 Agent 知道口令 |
+| “unauthorized” | token 不被认得 | 检查 `BSC_TOKEN`、`--token-file`、网址 |
+| “token_expired, renewable: false” | 已过续期窗口 | 到 UI 签发一把新的 |
+| “scope_mismatch” | 保险库对了，token 不对 | 放宽范围，或为该路径签发一把 |
+| “approval_pending”很久 | 没有人审批 | 打开收件箱；下次考虑先开任务窗口 |
+| “vault_sealed” | 服务重启过 | 到 UI 解封。绝不能让 Agent 知道口令 |
 | 它请你把敏感数据贴过去 | 它没有遵守指令 | 拒绝。并确认它真的走 `bsc mcp`，不是某个 shell 工具 |
 
 ---
@@ -148,4 +148,4 @@ curl -fsS -H "Authorization: Bearer $BSC_TOKEN" \
 - 所有 Agent 共用一把大范围 token。范围正是审计链有没有价值的关键。
 - 明明有 MCP，却让 Agent 用 shell 工具 `curl` 打 API：值会落进进程参数与 shell 历史。
 - 为了让流水线安静一点，把服务账户的审批关掉。改用任务窗口或预先授权，两者都会自己结束。
-- 「就这一次」把敏感数据贴出来以解开卡住的流程。那正是这套系统存在的目的——让那件事不必发生。
+- “就这一次”把敏感数据贴出来以解开卡住的流程。那正是这套系统存在的目的——让那件事不必发生。
