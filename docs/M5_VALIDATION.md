@@ -4,9 +4,9 @@
 **Gate text:** Claude Code / Codex / Agy recipes, CI and script patterns,
 scope-per-project guidance; a real multi-step agent task completes across a
 token renewal and an approval.
-**Status:** gate met, 2026-09-04, with the real-agent run performed by
-**Codex CLI 0.153** rather than Claude Code (reason below). Nothing here is a
-release.
+**Status:** gate met, 2026-09-04, by two real agents: **Codex CLI 0.153**
+first, then **Claude Code 2.1.233** once its CLI login was refreshed. Nothing
+here is a release.
 
 ## What was built
 
@@ -60,7 +60,33 @@ appear **inside the tool result** in the agent's transcript — that is what
 `get_secret` returns and is the reason `use_secret` (value never reaches the
 agent) is scheduled for M6.
 
-### Why Codex, not Claude Code
+### The Claude Code run — 2026-09-04 01:59 local
+
+Same daemon, same item name, a fresh 100 s token, `scripts/m5-gate.sh`
+unchanged. `claude -p --mcp-config … --allowedTools mcp__bsc__*`, seven
+turns, 46 s:
+
+```
+→ mcp__bsc__list_secrets {}                              ← token_expired
+  [assistant] The token expired but is renewable, so I'll renew and retry.
+→ mcp__bsc__renew_access {}                              ← renewable_until
+→ mcp__bsc__list_secrets {}                              ← items (two with that name; it took the first)
+→ mcp__bsc__get_secret {sref, reason: "M5 gate test: deploy build 1 to Firebase"}
+                                                         ← approval_pending
+  [assistant] Approval is pending, so I'll wait on it.
+→ mcp__bsc__check_access {approval_id, wait_seconds: 60} ← status: approved, project_id
+  [assistant] m5-gate-project
+```
+
+Approver: `approved apr_8e148f3d9061b633 at 02:00:13`, while the agent was
+inside `check_access`. Ledger: `token_renewed` for `tok_20f293a3a5d3d783`;
+the read landed on the *first* `m5-gate-service-account` item (the gate script
+creates a new one each run and the agent picked the earlier sref), so the
+per-item ledger the script prints for the new sref shows only `item_created`
+— the `secret_read` is on the sibling. The agent narrated each decision in one
+sentence and never printed the value.
+
+### Why the first run used Codex
 
 `claude -p` was attempted first and failed before any tool call:
 `Failed to authenticate: OAuth session expired`; `claude auth status` reported
@@ -87,8 +113,9 @@ would not be appropriate for a real working directory.
 
 ## Not done — explicitly
 
-- The gate run used Codex; **Claude Code and Agy were not exercised end to
-  end** in this session (auth state), only documented.
+- **Agy and Grok were not exercised end to end**, only documented; both are
+  logged in on the operator's machine and could be run with the same script
+  adapted to their MCP configuration.
 - Codex loaded the operator's other configured MCP servers alongside `bsc`
   and tried one of them first; a per-project Codex config with only `bsc`
   would be tidier and is what the integration doc recommends.

@@ -132,8 +132,8 @@ release exists. Until then every change lands under `Unreleased`.
 
 ### Status
 
-- M5 gate met on 2026-09-04 with Codex CLI; Claude Code and Agy documented
-  but not run end to end (CLI auth state).
+- M5 gate met on 2026-09-04 with Codex CLI and then Claude Code; Agy and
+  Grok documented but not run end to end.
 - M4 delivered on 2026-09-04: 95 passing tests and three release artifacts on
   CI run `33777806776`; the LaunchAgent was installed, hard-killed, watched
   restart, and removed on a real Mac; the reboot itself was not performed on
