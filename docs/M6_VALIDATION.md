@@ -68,10 +68,14 @@ What the tests establish, per step:
   (sha256 verified against the artifact's `.sha256`; previous binary kept as
   `/usr/local/bin/bsc.prev`). It now carries ①–⑤. The restart left the vault
   sealed, as expected without ①'s credential.
-- ① is **staged, not active**: `/etc/bsc/unattended.conf.staged` and
-  `/etc/bsc/` exist; `/etc/bsc/passphrase.cred` does not — it must be created
-  by the operator typing the passphrase into `systemd-creds encrypt`. Until
-  then every restart still needs a human unseal.
+- ① is **active** since 2026-09-04: the operator created
+  `/etc/bsc/passphrase.cred` with `systemd-creds encrypt` (the passphrase never
+  left their terminal), the drop-in was installed, and two consecutive
+  `systemctl restart bsc` came back `sealed:false`,
+  `unattended_unseal:"systemd-credential"`, with the ledger's
+  `unseal_unattended` record. The host has no TPM2, so the credential is bound
+  to `/var/lib/systemd/credential.secret` (root-only) — root on the host can
+  unseal, which is the trade-off ADR-level accepted for this step.
 - ③ is not configured on the host (no bot token / chat id supplied).
 - No anchor timer runs on the host yet; `bsc audit --anchor-file` is a manual
   command. A systemd timer writing to a location outside `/var/lib/bsc` is
@@ -79,7 +83,7 @@ What the tests establish, per step:
 
 ## Not done — explicitly
 
-- **Production activation of ①, ③, and the host binary upgrade** (above).
+- **Production activation of ③** (above); ① and the binary upgrade are done.
 - `use_secret` has run only against a mock upstream, never a real provider.
 - The Telegram channel has run only against a mock Bot API.
 - `bsc exec` was rejected on purpose: a child process the agent controls can
