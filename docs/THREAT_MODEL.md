@@ -63,6 +63,31 @@ items** — high-value classes (🔥 service accounts, ☁️ cloud root keys,
 📜 signing certificates) default to requiring an explicit human approval in the
 UI before each release, with the requesting token and reason shown.
 
+### A4b — Approval fatigue
+
+An operator prompted on every read learns to approve reflexively. The control
+then exists in the code and not in reality, which is worse than no control,
+because scopes and lifetimes get set as if a human were checking. Mitigated
+structurally rather than by exhortation: task sessions, trust-on-first-use per
+token × item inside a window, tiering so only high-value classes prompt by
+default, and pre-authorization for known work — all in
+[ADR 0005](adr/0005-approval-and-reminder-model.md). **Residual:** a task
+session is a real widening of authority for its duration; it is scoped,
+time-boxed, non-renewing, and fully recorded, and it is the first thing to
+review after an incident.
+
+### A4c — Abuse of the notification and approval channel
+
+An external approval channel is a new path into a security decision. Controls:
+the daemon connects **outbound only**, so no inbound port is opened; the
+message carries the item label, requesting token label, and stated reason but
+**never secret material and never a link that alone releases one**; approval is
+bound to a chat identity registered once from the local UI; and items may be
+flagged local-approval-only, so the external channel can notify but not
+approve. **Residual:** the approval control now depends on a third-party
+service being reachable, and a compromised messaging account can approve
+anything not flagged local-only.
+
 ### A5 — Local process snooping the daemon
 
 Loopback binding does not authenticate the peer. Controls: tokens required on
@@ -105,3 +130,8 @@ scope because the vault is single-operator by design.
 - Does any new code path bypass the audit chain?
 - Does any new default widen access, exposure, or lifetime?
 - Are new key materials zeroized, and are new parsers fuzzed?
+- Does it increase how often the operator is prompted? If so, it must argue
+  against ADR 0005, because prompt frequency is a security parameter.
+- Can a value be released without a `reason` recorded?
+- Does any error path answer with an undifferentiated failure that an agent
+  would resolve by improvising?

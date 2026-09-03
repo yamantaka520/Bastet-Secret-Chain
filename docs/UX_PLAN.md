@@ -77,7 +77,33 @@ A separate, off-by-default **⚡ Handoff link** action exists for the
 copy-and-paste-into-a-chat case. It mints a single-use, 60-second, loopback-bound
 link, labels it clearly as a live credential, and shows a visible countdown.
 
-## 5. Health and history
+## 5. Approvals, sessions, and expiry
+
+These three surfaces are where the human meets the automated loop, so they get
+the most design attention.
+
+**▶️ Task session control** sits in the header. Starting one asks for a scope
+and a duration (30 minutes default), then shows a live countdown and the count
+of reads it has covered. Ending it early is one click. It never renews itself;
+when it lapses the header returns to its resting state rather than quietly
+extending.
+
+**✋ Approval inbox** shows, per pending request: the item, the requesting
+token's label, the reason the agent gave, and a countdown to auto-deny. Approve
+and deny are single keystrokes. The reason is displayed prominently and
+verbatim — it is often where a manipulated agent gives itself away, and a
+truncated or prettified reason defeats that.
+
+Notifications escalate at 0 s (OS notification with Approve/Deny actions, tray
+badge, title badge), 20 s (repeat, with sound), and 60 s (external channel, if
+configured). An external message never contains secret material and never
+contains a link that alone releases one.
+
+**⏰ Expiry panel** lists tokens and credentials by time remaining, with a
+Renew action that extends a token rather than issuing a new value, so nothing
+in the agent's configuration has to change.
+
+## 6. Health and history
 
 - **Dashboard tiles:** total items, expiring in 30 days, rotation overdue,
   active tokens, reads in the last 24 h, denied reads.
@@ -86,7 +112,7 @@ link, labels it clearly as a live credential, and shows a visible countdown.
 - **Approval inbox:** pending agent requests with item, token label, and a
   requested reason; approve or deny in one keystroke.
 
-## 6. Look and feel
+## 7. Look and feel
 
 Light and dark, following the system theme with a manual override. A calm
 neutral ground with one accent color; emoji and status badges carry the color
@@ -95,7 +121,7 @@ Bastet Workstation shell so the two products feel related. Locale-ready with
 zh-Hant as the default and English second; no string is hard-coded in a
 component.
 
-## 7. Accessibility
+## 8. Accessibility
 
 Never color alone: every status badge pairs an emoji with text. Contrast at
 WCAG AA in both themes. Full keyboard operation, visible focus rings, and

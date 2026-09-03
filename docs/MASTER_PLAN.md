@@ -81,6 +81,11 @@ Full model: [`docs/THREAT_MODEL.md`](THREAT_MODEL.md). The headline risks:
   scope minimization and approval-required items are the primary defense, and
   high-value items (🔥 service accounts, 📜 signing certs) default to
   approval-required.
+- **Approval fatigue.** An operator asked to approve too often stops reading the
+  prompts, which removes the control while leaving the belief that it exists.
+  Addressed by [ADR 0005](adr/0005-approval-and-reminder-model.md): task
+  sessions, trust-on-first-use per token × item, tiered defaults, and
+  pre-authorization, so that the prompts that remain are worth reading.
 
 ## 4. Architecture
 
@@ -148,6 +153,16 @@ same item can live in one place and still be found many ways.
 - **Agent (handoff link):** for the copy-paste case the UI can mint a
   **single-use, 60-second, loopback-bound** handoff link. It is a distinct
   code path with its own audit action, and it is off by default.
+- **Agent (blocked read):** a read that needs approval, or whose token has
+  expired but is still inside its renewal window, returns `202` with an
+  `approval_id` and a `Retry-After` rather than a bare denial, so the waiting
+  agent has one unambiguous next step. Escalation and auto-deny follow
+  [ADR 0005](adr/0005-approval-and-reminder-model.md).
+- **Task sessions:** the operator may open a scoped, time-boxed window in which
+  in-scope reads are recorded but not interrupted. Windows do not auto-renew.
+- **Renewal:** `POST /v1/token/renew` extends an existing token inside its
+  renewal window. It never widens scope and never resurrects a token past the
+  grace period, so agent configuration never changes.
 - **Remote exposure:** opt-in only, requires TLS with a certificate the
   operator supplies, mutual TLS or a network allow-list, and a recorded
   acknowledgement written to the audit chain.
@@ -161,6 +176,26 @@ same item can live in one place and still be found many ways.
 - `bsc doctor` verifies bind address, file permissions (`0600` vault,
   `0700` directory), service state, keychain availability, and clock sanity.
 - Uninstall removes the service and leaves the vault untouched by default.
+
+### 4.6 Agent interface
+
+The HTTP API is the single source of truth and the single audit entry point.
+An MCP server ships inside the same binary (`bsc mcp`) as a thin wrapper over
+it and bypasses no check; it is the interface agents should use by default,
+because a tool description is a specification aimed at the model, the value
+never passes through a shell, and the token never appears in a command the agent
+generates. Full reasoning and the tool surface are in
+[ADR 0006](adr/0006-mcp-as-the-primary-agent-interface.md).
+
+The agent surface is read-only — `list_secrets`, `get_secret`,
+`request_access`, `check_access`, `renew_access`. Writing is something a human
+does in the Web UI. A `reason` is mandatory on every path that can release a
+value.
+
+Failures return a distinguishable code (`token_expired`, `scope_mismatch`,
+`approval_pending`, `approval_timeout`, `approval_denied`, `quota_exhausted`,
+`vault_sealed`) together with prose the agent will act on, including an explicit
+prohibition against asking a human to paste the secret into a conversation.
 
 ## 5. Web UI plan
 
@@ -183,11 +218,11 @@ Detail: [`docs/UX_PLAN.md`](UX_PLAN.md). Principles:
 | --- | --- | --- |
 | M0 | Repository and specification baseline | This plan, threat model, ADRs, license, security policy committed and pushed |
 | M1 | Crypto core and sealed storage | Argon2id/XChaCha20 envelope, SQLite WAL schema, seal/unseal, zeroization; property tests + known-answer vectors |
-| M2 | Daemon API, tokens, audit chain | Versioned API, scoped tokens, hash-chain ledger with a verifier; chain-tamper detection test |
-| M3 | Web UI | Upload → encrypt → classify → copy reference, per-item audit view; e2e test on all item types |
+| M2 | Daemon API, tokens, audit chain, MCP | Versioned API, scoped tokens, renewal, task sessions, pending-approval protocol, structured agent errors, hash-chain ledger with a verifier, `bsc mcp` server; chain-tamper detection test and an agent-facing error-contract test |
+| M3 | Web UI | Upload → encrypt → classify → copy reference, approval inbox, task-session control, ⏰ expiry panel, local OS notifications, per-item audit view; e2e test on all item types |
 | M4 | Packaging and auto-start | macOS/Windows/Linux artifacts, `service install`, `doctor`; three-platform CI plus one real-machine reboot survival test per platform |
-| M5 | Agent integration | Documented fetch patterns, MCP server, env-injection helper, Claude Code / Codex / Agy recipes |
-| M6 | Rotation, expiry, approvals | Expiry alerts, rotation workflow, approval-required reads, break-glass export |
+| M5 | Agent integration | Claude Code / Codex / Agy recipes, CI and script patterns, scope-per-project guidance; a real multi-step agent task completes across a token renewal and an approval |
+| M6 | Rotation, delegation, external approval | Rotation workflow, pre-authorization, outbound external approval channel, `use_secret` / `bsc exec` value-free delegation, audit-head anchoring, break-glass export |
 | M7 | Hardening and first release | External-review checklist, fuzzing on parsers, signed release, restore-from-backup drill |
 
 No milestone is claimed complete until its gate is met and the evidence is
@@ -203,11 +238,25 @@ Tracked so they are not silently decided by implementation:
    versus raw file copy. Needs a decision before M4 packaging.
 3. **TOTP** generation inside the vault: convenient, but it turns the vault
    into a second factor holder alongside the first. Deferred to M6.
-4. Whether agent reads should support a **use-once wrapper** (agent receives a
-   short-lived derived credential rather than the stored one) for providers
-   that support it. Would materially reduce blast radius; deferred to M6.
+4. ~~Whether agent reads should support a use-once wrapper.~~ **Resolved
+   2026-09-03**: the direction is accepted as `use_secret` / `bsc exec`, where
+   the daemon injects the value into a child process or proxies the call so the
+   agent never observes the credential. See
+   [ADR 0006](adr/0006-mcp-as-the-primary-agent-interface.md); implementation
+   scheduled for M6. Which providers support genuinely derived short-lived
+   credentials remains to be surveyed.
 5. **BastetAgentOS / Bastet Workstation integration** — BSC as their credential
    provider. Not before M5, and not a design constraint on M1–M4.
+6. The default parameters in [ADR 0005](adr/0005-approval-and-reminder-model.md)
+   §6 are chosen, not measured. Which of them are actually wrong will only be
+   visible after real use; the 5-minute auto-deny and the 30-minute task window
+   are the two most likely to need changing.
+7. Which external approval channel to bind first. Telegram is the pragmatic
+   choice because the operator already runs that infrastructure, but it makes
+   an approval control depend on a third-party service being reachable.
+8. What the daemon should do when the operator is provably away — currently
+   every pending request simply auto-denies after five minutes, which may be
+   the wrong behavior for a long unattended batch.
 
 ## 8. Synchronization duty
 
