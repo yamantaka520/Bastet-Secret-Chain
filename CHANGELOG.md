@@ -42,7 +42,25 @@ release exists. Until then every change lands under `Unreleased`.
   open questions recorded, including that ADR 0005's default parameters are
   chosen rather than measured.
 
+- **M1 — `bsc-crypto`**: Argon2id KDF with stored parameters and an enforced
+  minimum, XChaCha20-Poly1305 envelope encryption with per-version data keys
+  and identity-binding associated data, direct field encryption for names,
+  paths, and tags, HKDF-derived blind index, zeroizing key types, opaque
+  decryption failure. 19 property tests and 4 known-answer vectors.
+- **M1 — `bsc-store`**: SQLite WAL vault with `0600` permissions, sealed/
+  unsealed lifecycle with a header verifier, items and append-only versions,
+  exact-token search over the blind index, and a SHA-256 hash-chained audit
+  ledger whose `secret_read` record is written before decryption. Sealed
+  reads and rejected passphrases are recorded as `denied`. 20 tests including
+  tamper detection and a documented tail-truncation residual.
+- `docs/API_CONTRACT.md`: v1 HTTP API and MCP tool surface, identifier and
+  token formats, the `202 approval_pending` flow, renewal and task-session
+  semantics, and the full error table with `next_action` / `do_not` text.
+- `docs/M1_VALIDATION.md`: evidence and an explicit not-done list.
+- GitHub Actions CI: fmt, clippy `-D warnings`, tests on Ubuntu/macOS/Windows,
+  KAT regeneration check, and a credential-pattern scan of the tree.
+
 ### Status
 
-- No implementation yet. M0 (repository and specification baseline) is the
-  active milestone; M1 onwards has not started.
+- M1 delivered locally on 2026-09-03 with 43 passing tests; three-platform CI
+  evidence pending first run. M2 has a contract but no code. No release.

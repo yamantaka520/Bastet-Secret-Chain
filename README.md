@@ -7,9 +7,12 @@ without the secret ever living in a URL, a prompt, or a shell history.**
 Humans put credentials in through a Web UI. Agents take them out through an
 authenticated reference. Every retrieval is appended to a tamper-evident chain.
 
-> **Status: M0 — repository and specification baseline.**
-> This repository currently contains the accepted plan, threat model, and
-> architecture decisions. There is no implementation yet.
+> **Status: M1 delivered locally; M2 contract drafted.**
+> `bsc-crypto` and `bsc-store` implement the envelope encryption, sealed
+> SQLite vault, blind index, and hash-chained ledger with 43 passing tests.
+> There is no daemon, API, MCP server, or UI yet — their shape is fixed in
+> [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md). Evidence and explicit gaps:
+> [`docs/M1_VALIDATION.md`](docs/M1_VALIDATION.md).
 
 ## What it stores
 
@@ -66,6 +69,8 @@ not follow them there.
 | [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md) | **Single authority** for scope, architecture, milestones, gates |
 | [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) | Assets, adversaries, trust boundaries, residual risks |
 | [`docs/UX_PLAN.md`](docs/UX_PLAN.md) | Web UI information architecture and interactions |
+| [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) | HTTP API and MCP tool contract, error codes, `do_not` text |
+| [`docs/M1_VALIDATION.md`](docs/M1_VALIDATION.md) | M1 test evidence and what is explicitly not done |
 | [`docs/adr/`](docs/adr) | Architecture decision records 0001–0006 |
 | [`CHANGELOG.md`](CHANGELOG.md) | History of changes |
 
@@ -76,6 +81,15 @@ M3 Web UI →
 M4 packaging and auto-start → M5 agent integration → M6 rotation, delegation,
 external approval → M7 hardening and first release. Gates are defined in the master
 plan; nothing is claimed done until its gate is met.
+
+## Building
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+cargo run -p bsc-crypto --example gen_vectors   # regenerates the KAT lines
+```
 
 ## Project policies
 

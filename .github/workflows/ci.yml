@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Test
+        run: cargo test --workspace --locked
+      - name: Known-answer vectors regenerate identically
+        shell: bash
+        run: |
+          cargo run -q -p bsc-crypto --example gen_vectors > vectors.txt
+          grep -q "aad_hex = 050000006273632f310500000069745f30310100000004000000626f6479" vectors.txt
+          grep -q 'tag(name, "aws") = fe9529c8e2ef072a16d78d5f90152e0b' vectors.txt
+          grep -q 'tag(path, "prod") = 4651110e1415ddfe20eaaaa2a015e998' vectors.txt
+
+  secrets-hygiene:
+    name: No secret material in tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for credential patterns
+        run: |
+          set -e
+          if grep -rnE 'AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY|xox[baprs]-[0-9A-Za-z-]{10,}|ghp_[A-Za-z0-9]{36}|"private_key"\s*:' \
+               --exclude-dir=.git --exclude-dir=target . ; then
+            echo "credential-shaped content found"; exit 1
+          fi
+          echo "clean"

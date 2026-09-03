@@ -228,6 +228,15 @@ Detail: [`docs/UX_PLAN.md`](UX_PLAN.md). Principles:
 No milestone is claimed complete until its gate is met and the evidence is
 recorded in this repository and mirrored to BastetMind.
 
+### 6.1 Status
+
+| Milestone | State | Evidence |
+| --- | --- | --- |
+| M0 | complete, 2026-09-03 | this repository at `2e3197b` and `0f33b25` |
+| M1 | delivered locally, 2026-09-03; CI evidence pending | [`M1_VALIDATION.md`](M1_VALIDATION.md) |
+| M2 | contract drafted, no code | [`API_CONTRACT.md`](API_CONTRACT.md) |
+| M3–M7 | not started | — |
+
 ## 7. Open questions
 
 Tracked so they are not silently decided by implementation:
