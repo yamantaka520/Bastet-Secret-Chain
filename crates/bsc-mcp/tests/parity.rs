@@ -150,6 +150,7 @@ async fn tools_list_is_exactly_the_read_only_six_with_safety_text() {
             "get_secret",
             "request_access",
             "check_access",
+            "use_secret",
             "renew_access"
         ]
     );
@@ -174,6 +175,14 @@ async fn tools_list_is_exactly_the_read_only_six_with_safety_text() {
     assert_eq!(
         tools[1]["inputSchema"]["required"],
         json!(["sref", "reason"])
+    );
+    let use_desc = tools[4]["description"].as_str().unwrap();
+    assert!(
+        use_desc.contains("WITHOUT seeing it") && use_desc.contains("never ask the user to paste")
+    );
+    assert_eq!(
+        tools[4]["inputSchema"]["required"],
+        json!(["sref", "reason", "url"])
     );
 }
 

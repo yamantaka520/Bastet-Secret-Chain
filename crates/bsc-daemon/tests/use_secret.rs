@@ -201,11 +201,14 @@ async fn binding_validation() {
         .bind(&sref, &["https://api.example/*"], "X-Api-Key: fixed", &[])
         .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
-    // http:// patterns are refused
+    // a pattern without a host is refused (this harness runs relaxed, so
+    // plain http is allowed here; the strict-mode refusal is tested below)
     let (s, _) = h
-        .bind(&sref, &["http://api.example/*"], "X-Api-Key: {value}", &[])
+        .bind(&sref, &["https://*"], "X-Api-Key: {value}", &[])
         .await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = h.bind(&sref, &[], "X-Api-Key: {value}", &[]).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "empty url list");
     // listing shows the flag, detail shows the binding, and a token never sees the header template value
     let (_, list) = h.human(Method::GET, "/v1/items", None).await;
     let row = list["items"]
@@ -375,6 +378,20 @@ async fn ssrf_guard_refuses_private_targets_when_not_allowed() {
         .as_str()
         .unwrap()
         .to_string();
+    // Strict mode: http:// patterns are refused outright.
+    let r = human(
+        Method::PUT,
+        &format!("/v1/items/{sref}/use"),
+        json!({ "binding": { "urls": ["http://api.example/*"], "header": "Authorization: Bearer {value}", "methods": ["GET"] } }),
+    )
+    .send()
+    .await
+    .unwrap();
+    assert_eq!(
+        r.status(),
+        StatusCode::BAD_REQUEST,
+        "http pattern must be refused in strict mode"
+    );
     human(Method::PUT, &format!("/v1/items/{sref}/use"), json!({ "binding": { "urls": ["https://127.0.0.1/*", "https://localhost/*", "https://10.0.0.5/*", "https://169.254.169.254/*"], "header": "Authorization: Bearer {value}", "methods": ["GET"] } })).send().await.unwrap();
     for url in [
         "https://127.0.0.1/admin",
