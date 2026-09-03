@@ -1,8 +1,10 @@
 # Deploying behind a reverse proxy
 
 **Status:** first done on 2026-09-04 for `https://sec.bastet.tw` on the host
-`192.168.100.250` (Ubuntu 26.04, nginx 1.28, Cloudflare Tunnel already in
-place). This pulls the master plan's remote-exposure gate (§4.4) forward from
+`192.168.100.250` (Ubuntu 26.04, nginx 1.28). Cloudflare proxies the hostname
+(orange cloud) and reaches nginx through the site's public IP and a router
+port-forward on 443 — **not** through the host's Cloudflare Tunnel, which
+carries only `mizuki-line.bastet.tw` and, since this work, `ssh.bastet.tw`. This pulls the master plan's remote-exposure gate (§4.4) forward from
 M6/M7 at the operator's request; what was implemented and what was not is
 listed at the end.
 
@@ -81,15 +83,54 @@ for a host that runs other things.
 
 ## Cloudflare specifics
 
-- The tunnel forwards to nginx; nginx sees the client as the tunnel's
-  loopback address and the real client in `CF-Connecting-IP`. The site config
+- Cloudflare's proxy connects to nginx on the public IP; nginx sees Cloudflare
+  as `$remote_addr` and the real client in `CF-Connecting-IP`. The site config
   maps that into `X-Forwarded-For` and **overwrites** any inbound value, so a
   client cannot supply its own.
-- Because the tunnel terminates the public TLS at Cloudflare, `sec.bastet.tw`
-  is only as private as the Cloudflare account. That is the trade the operator
-  accepted by using the tunnel for the rest of `bastet.tw` already.
+- Cloudflare terminates the public TLS and re-encrypts to nginx with the
+  wildcard `*.bastet.tw` certificate, so `sec.bastet.tw` is only as private as
+  the Cloudflare account — the same trade the rest of `bastet.tw` already
+  makes.
+- **The origin is directly reachable.** Anyone who knows the public IP can
+  send `Host: sec.bastet.tw` straight to nginx on 443, bypassing Cloudflare
+  (verified with `curl --resolve`). The vault's own authentication and
+  throttle still apply, but Cloudflare-side controls (Access, WAF, rate
+  limits) would not. Mitigation when wanted: restrict 443 on the router or
+  host firewall to Cloudflare's published IP ranges, or move the hostname
+  onto the tunnel and close the port-forward. Not done; recorded.
 - The daemon does not know about Cloudflare; it knows one origin and one
   forwarded-for header.
+
+## SSH over the same Cloudflare Tunnel (`ssh.bastet.tw`)
+
+Requested alongside this deployment: reach the host's sshd through the
+existing tunnel `d276e209-…`, allowed only from two IPs.
+[`deploy/cloudflare-ssh-tunnel.sh`](../deploy/cloudflare-ssh-tunnel.sh) does
+it idempotently through the API with a token read from a file:
+
+1. **Tunnel ingress** — adds `ssh.bastet.tw → ssh://localhost:22` ahead of the
+   catch-all, keeping the existing `mizuki-line.bastet.tw` rule. *Done.*
+2. **DNS** — a proxied CNAME `ssh.bastet.tw → <tunnel-id>.cfargotunnel.com`.
+   *Failed on the first run: the token had Zone:Read but not DNS:Edit on
+   `bastet.tw`.* Re-run after widening the token, or create it by hand.
+3. **Access** — a self-hosted app of type `ssh` for the hostname with one
+   policy, **Bypass** when the client IP is `172.216.48.153/32` or
+   `59.124.17.34/32`. Everything else is denied at Cloudflare's edge before
+   reaching the tunnel. *Done* (app `508fe70e-…`).
+
+Client side, on an allow-listed machine with `cloudflared` installed:
+
+```
+Host ssh.bastet.tw
+  ProxyCommand cloudflared access ssh --hostname %h
+  User CatWhiskers
+  IdentityFile ~/.ssh/<key>
+```
+
+sshd on the host already has `PasswordAuthentication no` and
+`PubkeyAuthentication yes`, so the tunnel adds a network gate in front of an
+already key-only service; it does not replace key auth. Port 22 remains open
+on the LAN as before — closing it is a separate decision.
 
 ## Not done
 
@@ -99,3 +140,6 @@ for a host that runs other things.
 - The system unit and nginx config are hand-written for this host;
   `bsc service install --system` does not exist yet.
 - `bsc doctor` cannot check file permissions on a remote vault.
+- The origin's direct reachability on the public IP (above) is not mitigated.
+- The `ssh.bastet.tw` CNAME was not created by the script (token scope); the
+  negative test from a non-allow-listed IP could not run until DNS exists.

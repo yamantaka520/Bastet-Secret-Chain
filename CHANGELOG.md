@@ -122,6 +122,10 @@ release exists. Until then every change lands under `Unreleased`.
   definition. Without the flag `X-Forwarded-For` is ignored and the throttle is
   one local bucket. `deploy/` holds the nginx site, proxy snippet, and a
   hardened system unit; `docs/DEPLOY_REVERSE_PROXY.md` explains the trade-offs.
+- `deploy/cloudflare-ssh-tunnel.sh`: idempotently publishes a host's sshd on
+  an existing remotely-managed Cloudflare Tunnel (ingress + proxied CNAME +
+  Access app with a Bypass-by-IP policy), token read from a file, never
+  printed.
 
 - **M5 — agent integration**: `docs/AGENT_INTEGRATION.md` (Claude Code,
   Codex, Agy/Gemini, scripts and CI, scope-per-project, troubleshooting,
