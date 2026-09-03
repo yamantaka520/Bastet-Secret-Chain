@@ -1,0 +1,9 @@
+Bastet Secret Chain
+Copyright 2026 Manfred Hsu
+
+This product includes software developed as part of the Bastet project family.
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Bastet Secret Chain is a self-hosted secret vault. This repository contains
+source code and documentation only. It must never contain vault databases,
+key material, exported secrets, service-account files, or audit ledgers.
