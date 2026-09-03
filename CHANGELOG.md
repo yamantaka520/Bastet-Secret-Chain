@@ -123,8 +123,17 @@ release exists. Until then every change lands under `Unreleased`.
   one local bucket. `deploy/` holds the nginx site, proxy snippet, and a
   hardened system unit; `docs/DEPLOY_REVERSE_PROXY.md` explains the trade-offs.
 
+- **M5 — agent integration**: `docs/AGENT_INTEGRATION.md` (Claude Code,
+  Codex, Agy/Gemini, scripts and CI, scope-per-project, troubleshooting,
+  anti-patterns), `scripts/m5-gate.sh`, and a recorded real-agent run in
+  which Codex CLI, through `bsc mcp`, met an expired token, renewed it, hit
+  `approval_pending`, waited in `check_access` while a human approved, and
+  answered with only the requested field.
+
 ### Status
 
+- M5 gate met on 2026-09-04 with Codex CLI; Claude Code and Agy documented
+  but not run end to end (CLI auth state).
 - M4 delivered on 2026-09-04: 95 passing tests and three release artifacts on
   CI run `33777806776`; the LaunchAgent was installed, hard-killed, watched
   restart, and removed on a real Mac; the reboot itself was not performed on

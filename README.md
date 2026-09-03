@@ -76,6 +76,9 @@ not follow them there.
 | [`docs/M2_VALIDATION.md`](docs/M2_VALIDATION.md) | M2 evidence: the error-contract and MCP-parity gate tests, explicit gaps |
 | [`docs/M3_VALIDATION.md`](docs/M3_VALIDATION.md) | M3 evidence: all-types round trip, served-UI test, recorded browser pass, the e2e substitution |
 | [`docs/M4_VALIDATION.md`](docs/M4_VALIDATION.md) | M4 evidence: service definitions, doctor, artifacts; the reboot test that was not run |
+| [`docs/AGENT_INTEGRATION.md`](docs/AGENT_INTEGRATION.md) | How to give Claude Code, Codex, Agy, scripts, and CI access — and what to tell the agent |
+| [`docs/M5_VALIDATION.md`](docs/M5_VALIDATION.md) | M5 evidence: the recorded real-agent run across renewal and approval |
+| [`docs/DEPLOY_REVERSE_PROXY.md`](docs/DEPLOY_REVERSE_PROXY.md) | Running behind nginx / Cloudflare with `--public-origin`; what it does and does not protect |
 | [`docs/adr/`](docs/adr) | Architecture decision records 0001–0006 |
 | [`CHANGELOG.md`](CHANGELOG.md) | History of changes |
 
@@ -84,6 +87,7 @@ not follow them there.
 M0 baseline → M1 crypto core → M2 daemon API, tokens, audit chain, MCP server →
 M3 Web UI (done) →
 M4 packaging and auto-start (artifacts, service, doctor done; reboot test pending) →
+M5 agent integration (done) →
 M4 packaging and auto-start → M5 agent integration → M6 rotation, delegation,
 external approval → M7 hardening and first release. Gates are defined in the master
 plan; nothing is claimed done until its gate is met.
