@@ -472,3 +472,25 @@ fn item_flags_update_and_default_local_only_is_false() {
     assert_eq!(m.expires_at, None);
     assert!(m.approval_required, "untouched fields stay");
 }
+
+#[test]
+fn scope_prefix_tolerates_glob_and_trailing_slash_spellings() {
+    use bsc_store::access::Scope;
+    let sc = |p: &str| Scope {
+        paths: vec![p.into()],
+        tags: vec![],
+    };
+    for spelling in ["test", "test/", "test/*", " test/* "] {
+        let s = sc(spelling);
+        assert!(s.covers("test/telegram-probe", &[]), "{spelling:?}");
+        assert!(s.covers("test", &[]), "{spelling:?}");
+        assert!(!s.covers("testing/x", &[]), "{spelling:?}");
+        assert!(!s.covers("prod/test", &[]), "{spelling:?}");
+    }
+    // Inner scopes written with a glob still sit inside the outer prefix.
+    assert!(sc("test/a/*").within(&sc("test")));
+    assert!(!sc("prod/*").within(&sc("test/*")));
+    // A lone `*` means everything; a literal `*` never sneaks into a path match.
+    assert!(sc("*").covers("anything/at/all", &[]));
+    assert!(!sc("te*").covers("test/x", &[]));
+}

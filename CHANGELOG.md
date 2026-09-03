@@ -6,6 +6,9 @@ release exists. Until then every change lands under `Unreleased`.
 
 ## [Unreleased]
 
+- **Fixed: scope spelling.** A token or session path scope written as
+  `test/*` or `test/` now means the same as `test` (the subtree). Previously
+  the `*` was matched literally and such a token saw nothing.
 - **Fixed: schema migration.** Vault files written by an earlier binary
   (schema 1, M1–M5) now migrate to schema 2 on open: `item.use_ct` and
   `item.rotation_days` are added, `approval` loses its item foreign key,

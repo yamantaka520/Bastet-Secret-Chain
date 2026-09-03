@@ -34,10 +34,25 @@ pub struct Scope {
 }
 
 impl Scope {
+    /// A scope entry as a bare prefix. People write `prod/gcp/*`, `prod/gcp/`
+    /// or `prod/gcp` and mean the same subtree; only the last form is what
+    /// the matcher wants. Keeps a lone `*` meaning "everything".
+    pub fn normalize_prefix(p: &str) -> &str {
+        let t = p.trim().trim_end_matches('/');
+        if t == "*" {
+            return "";
+        }
+        t.trim_end_matches('*').trim_end_matches('/')
+    }
+
     /// Whether an item with this path and these tags is covered.
     pub fn covers(&self, path: &str, tags: &[String]) -> bool {
-        let path_hit = self.paths.iter().any(|p| {
-            let p = p.trim_end_matches('/');
+        let path_hit = self.paths.iter().any(|raw| {
+            let p = Self::normalize_prefix(raw);
+            if p.is_empty() {
+                // A bare `*` (or `/`) was written: everything is in scope.
+                return raw.trim().trim_end_matches('/') == "*";
+            }
             path == p || path.starts_with(p) && path[p.len()..].starts_with('/')
         });
         let tag_hit = self.tags.iter().any(|t| tags.iter().any(|it| it == t));
@@ -47,7 +62,9 @@ impl Scope {
     /// Whether this scope is entirely inside `outer`: every path prefix here
     /// is covered by `outer`, and every tag here appears in `outer`.
     pub fn within(&self, outer: &Scope) -> bool {
-        self.paths.iter().all(|p| outer.covers(p, &[]))
+        self.paths
+            .iter()
+            .all(|p| outer.covers(Self::normalize_prefix(p), &[]))
             && self.tags.iter().all(|t| outer.tags.contains(t))
     }
 }
