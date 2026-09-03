@@ -1,6 +1,7 @@
 # Agent integration
 
-**Status:** M5, 2026-09-04. How an agent reaches the vault, in order of
+**Status:** current as of 0.1.0, 2026-09-04. Step-by-step manuals in five
+languages: [`docs/manual/`](manual/) — this file is the per-client reference. How an agent reaches the vault, in order of
 preference, and what to tell it. The MCP server is the default (ADR 0006); the
 HTTP API is for scripts, CI, and anything that does not speak MCP.
 
@@ -9,7 +10,7 @@ HTTP API is for scripts, CI, and anything that does not speak MCP.
 1. A human mints a **scoped, expiring token** in the UI (or `POST /v1/tokens`)
    and puts it in the agent's **configuration** — never in a prompt, a
    transcript, a repository, or a URL.
-2. The agent gets the vault as an **MCP server** with five read-only tools.
+2. The agent gets the vault as an **MCP server** with six read-only tools.
 3. The agent's instructions say: *use `list_secrets` to find the sref, call
    `get_secret` with a concrete `reason`, never write the value to a file or
    repeat it, and if the result is `approval_pending` wait with

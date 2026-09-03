@@ -28,7 +28,7 @@ const zh = {
   wants: "想讀取", reason_label: "Agent 說的理由", auto_deny_in: "{s} 後自動拒絕", escalated: "已升級 {n} 階",
   sessions_title: "任務窗口", start_session: "▶️ 開始任務", end_session: "結束", session_active: "任務中 · 剩 {t}",
   duration: "時長", min15: "15 分鐘", min30: "30 分鐘", min60: "1 小時", min120: "2 小時",
-  session_hint: "窗口內、範圔內的讀取只記錄不打擾。窗口到期不會自動延長。", no_sessions: "沒有進行中的任務窗口。",
+  session_hint: "窗口內、範圍內的讀取只記錄不打擾。窗口到期不會自動延長。", no_sessions: "沒有進行中的任務窗口。",
   expiry_title: "到期追蹤", expiry_items: "機敏資料", expiry_tokens: "Token", days_left: "{d} 天", hours_left: "{h} 小時", nothing_expiring: "沒有設定到期日的項目。",
   audit_title: "稽核鏈", verify: "重新驗證", records: "筆紀錄", head: "鏈首", when: "時間", actor: "執行者", action: "動作", subject: "對象", outcome: "結果",
   prev: "上一頁", next: "下一頁", sealed_banner: "保險庫已上鎖。名稱與內容不可讀,列表只顯示中繼資料。",

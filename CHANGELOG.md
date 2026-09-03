@@ -6,6 +6,13 @@ release exists. Until then every change lands under `Unreleased`.
 
 ## [Unreleased]
 
+- **Added: manuals in five languages.** `docs/manual/` carries an
+  installation manual, a user guide and an AI-agent guide in Traditional
+  Chinese, Simplified Chinese, English, Japanese and Korean, all sharing one
+  structure. English is the source edition; the technical references
+  (API contract, threat model, ADRs) stay English on purpose. README gained a
+  language bar and its status block now matches the shipped software.
+
 ## [0.1.0] - 2026-09-04
 
 First tagged build. Everything from M0 to M6 is in it; see

@@ -1,6 +1,8 @@
 # Bastet Secret Chain — Master Plan
 
-**Status:** accepted baseline, 2026-09-03. No implementation yet.
+**Status:** M0–M6 delivered; released as `v0.1.0` on 2026-09-04. M7 (hardening,
+signed binaries, dependency refresh, external review) not started. Per-milestone
+evidence and gaps live in the `M*_VALIDATION.md` files.
 **Authority:** this file is the single authority for scope, architecture,
 milestones, and gates. Any other document that disagrees with it is stale.
 
