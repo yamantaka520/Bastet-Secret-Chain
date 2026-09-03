@@ -52,6 +52,7 @@ async fn fixture() -> (Fx, String, String, String) {
                 env: None,
                 approval_required: None,
                 expires_at: None,
+                rotation_days: None,
             },
             body,
             &human,

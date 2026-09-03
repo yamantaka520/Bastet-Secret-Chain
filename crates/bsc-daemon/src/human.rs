@@ -16,7 +16,7 @@ use bsc_store::{
     Actor,
 };
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use zeroize::Zeroizing;
 
 use crate::{
@@ -44,6 +44,8 @@ fn meta_json(m: &ItemMeta) -> serde_json::Value {
         "approval_required": m.approval_required,
         "local_approval_only": m.local_approval_only,
         "has_use_binding": m.has_use_binding,
+        "rotation_days": m.rotation_days,
+        "rotation_due_at": m.rotation_due_at().map(rfc3339),
         "version": m.current_version,
         "size": m.size,
     })
@@ -145,6 +147,121 @@ pub async fn unseal(
     Ok(resp)
 }
 
+#[derive(Deserialize)]
+pub struct ChangePassphrase {
+    current: String,
+    new: String,
+}
+
+/// `POST /v1/vault/passphrase` — rotate the passphrase. Re-authenticates with
+/// the current one; Argon2id runs twice, so this goes to a blocking thread.
+pub async fn change_passphrase(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    b: Result<Json<ChangePassphrase>, JsonRejection>,
+) -> Res {
+    let actor = auth::human(&state, &headers, true)?;
+    let req = body(b)?;
+    if req.new.chars().count() < 12 {
+        return Err(ApiError::invalid_request(
+            "new passphrase must be at least 12 characters",
+        ));
+    }
+    let cur = Zeroizing::new(req.current);
+    let new = Zeroizing::new(req.new);
+    let st = state.clone();
+    tokio::task::spawn_blocking(move || -> Result<(), ApiError> {
+        let mut v = st.vault();
+        v.rotate_passphrase(cur.as_bytes(), new.as_bytes(), &actor)?;
+        Ok(())
+    })
+    .await
+    .map_err(ApiError::internal)??;
+    // Every other session must re-authenticate against the new passphrase.
+    state.clear_human_sessions();
+    Ok(Json(json!({ "rotated": true, "note": "all human sessions were ended; log in again with the new passphrase" })).into_response())
+}
+
+#[derive(Deserialize, Default)]
+pub struct DeleteItem {
+    #[serde(default)]
+    reason: String,
+}
+
+/// `DELETE /v1/items/{sref}` — hard delete; the ledger keeps the history.
+pub async fn delete_item(
+    State(state): State<Arc<AppState>>,
+    Path(sref): Path<String>,
+    headers: HeaderMap,
+    b: Result<Json<DeleteItem>, JsonRejection>,
+) -> Res {
+    let actor = auth::human(&state, &headers, true)?;
+    let req = match b {
+        Ok(Json(r)) => r,
+        Err(_) => DeleteItem::default(),
+    };
+    state.vault().delete_item(&sref, &actor, &req.reason)?;
+    Ok(Json(json!({ "sref": sref, "deleted": true })).into_response())
+}
+
+#[derive(Deserialize)]
+pub struct Grant {
+    token_id: String,
+    sref: String,
+    ttl_seconds: Option<i64>,
+}
+
+/// `POST /v1/grants` — pre-authorize a token for an item (ADR 0005 §1).
+pub async fn create_grant(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    b: Result<Json<Grant>, JsonRejection>,
+) -> Res {
+    let actor = auth::human(&state, &headers, true)?;
+    let req = body(b)?;
+    let ttl = req.ttl_seconds.unwrap_or(state.config.grant_ttl);
+    let until = state
+        .vault()
+        .grant_direct(&req.token_id, &req.sref, ttl, &actor)
+        .map_err(|e| match e {
+            bsc_store::StoreError::NotFound => ApiError::not_found("Token or item"),
+            o => o.into(),
+        })?;
+    Ok((
+        StatusCode::CREATED,
+        Json(json!({ "token_id": req.token_id, "sref": req.sref, "until": rfc3339(until) })),
+    )
+        .into_response())
+}
+
+/// `GET /v1/grants` — live grants with labels where the vault is unsealed.
+pub async fn list_grants(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Res {
+    auth::human(&state, &headers, false)?;
+    let v = state.vault();
+    let mut out = Vec::new();
+    for g in v.active_grants()? {
+        let (tok, item, apr, until) = (g.token_id, g.item_id, g.approval_id, g.expires_at);
+        let label = v.token(&tok).ok().and_then(|t| t.label);
+        let name = v.detail(&item).ok().map(|d| d.name);
+        out.push(json!({ "token_id": tok, "token_label": label, "sref": item, "item_name": name, "source": if apr == "pre" { "pre-authorized" } else { "approval" }, "approval_id": if apr == "pre" { Value::Null } else { json!(apr) }, "until": rfc3339(until) }));
+    }
+    Ok(Json(json!({ "grants": out })).into_response())
+}
+
+/// `DELETE /v1/grants/{tok}/{sref}`
+pub async fn revoke_grant(
+    State(state): State<Arc<AppState>>,
+    Path((tok, sref)): Path<(String, String)>,
+    headers: HeaderMap,
+) -> Res {
+    let actor = auth::human(&state, &headers, true)?;
+    let removed = state.vault().revoke_grant(&tok, &sref, &actor)?;
+    if !removed {
+        return Err(ApiError::not_found("Grant"));
+    }
+    Ok(Json(json!({ "token_id": tok, "sref": sref, "revoked": true })).into_response())
+}
+
 /// `POST /v1/vault/seal`
 pub async fn seal(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Res {
     let actor = auth::human(&state, &headers, true)?;
@@ -213,6 +330,7 @@ pub struct CreateItem {
     env: Option<String>,
     approval_required: Option<bool>,
     expires_at: Option<i64>,
+    rotation_days: Option<u32>,
     value: Option<String>,
     value_base64: Option<String>,
 }
@@ -241,6 +359,7 @@ pub async fn create_item(
             env: req.env,
             approval_required: req.approval_required,
             expires_at: req.expires_at,
+            rotation_days: req.rotation_days,
         },
         &bytes,
         &actor,
@@ -282,6 +401,8 @@ pub struct PatchItem {
     expires_at: Option<Option<i64>>,
     #[serde(default, deserialize_with = "double_option")]
     env: Option<Option<String>>,
+    #[serde(default, deserialize_with = "double_option")]
+    rotation_days: Option<Option<u32>>,
 }
 
 fn double_option<'de, T, D>(d: D) -> Result<Option<Option<T>>, D::Error>
@@ -307,6 +428,7 @@ pub async fn patch_item(
         p.local_approval_only,
         p.expires_at,
         p.env,
+        p.rotation_days,
         &actor,
     )?;
     Ok(Json(meta_json(&m)).into_response())

@@ -134,15 +134,18 @@ recover without a human by calling renew.
 | --- | --- | --- |
 | `POST` | `/v1/vault/unseal` | Passphrase → unseal |
 | `POST` | `/v1/vault/seal` | Drop the KEK |
+| `POST` | `/v1/vault/passphrase` | `{ current, new }` — rotate the passphrase: rewraps every DEK, re-encrypts KEK-direct fields, rebuilds the blind index, replaces the verifier; ends every human session |
 | `GET` | `/v1/vault/status` | sealed/unsealed, item count, chain head, uptime |
 | `GET` `POST` | `/v1/items` | List / create |
-| `GET` `PATCH` | `/v1/items/{sref}` | Detail / metadata edit |
+| `GET` `PATCH` `DELETE` | `/v1/items/{sref}` | Detail / metadata edit (`approval_required`, `local_approval_only`, `expires_at`, `env`, `rotation_days`) / hard delete with `{ reason }` — versions, index rows, and grants go; approvals and the ledger stay |
 | `POST` | `/v1/items/{sref}/versions` | Add a version (rotate) |
 | `PUT` | `/v1/items/{sref}/use` | Set or clear the use binding `{ binding: { urls: ["https://…/*"], header: "Authorization: Bearer {value}", methods: ["GET","POST"] } \| null }` |
 | `POST` | `/v1/items/{sref}/reveal` | Human reveal; body `{ passphrase? }` — required for approval-required items |
 | `GET` `POST` | `/v1/tokens` | List / mint (value returned exactly once) |
 | `DELETE` | `/v1/tokens/{tok}` | Revoke |
 | `GET` `POST` | `/v1/sessions` | List / open a task session `{scope, duration}` |
+| `GET` `POST` | `/v1/grants` | Live grants / pre-authorize `{ token_id, sref, ttl_seconds? }` (capped at token expiry; ADR 0005 §1) |
+| `DELETE` | `/v1/grants/{tok}/{sref}` | Revoke a grant, pre-authorized or from an approval |
 | `DELETE` | `/v1/sessions/{ses}` | End early |
 | `GET` | `/v1/approvals` | Inbox |
 | `POST` | `/v1/approvals/{apr}/approve` · `/deny` | Decide |
@@ -176,7 +179,7 @@ local bucket.
 `vault_created` `unseal` `login` `seal` `item_created` `item_updated`
 `version_added` `secret_read` `search` `token_minted` `token_renewed`
 `token_revoked` `secret_used` `session_opened` `session_closed` `approval_requested`
-`approval_notified`
+`approval_notified` `grant_issued` `grant_revoked` `item_deleted` `passphrase_rotated`
 `approval_escalated` `approval_decided` `approval_timeout` and, once
 implemented, `handoff_minted` `handoff_used` `exposure_acknowledged`.
 `approval_escalated` carries `step`; the notification itself is the

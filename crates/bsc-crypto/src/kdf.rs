@@ -56,6 +56,20 @@ impl KdfParams {
         })
     }
 
+    /// Same cost parameters as `like`, fresh random salt. Used on passphrase
+    /// rotation so a test vault keeps its fast parameters and a production
+    /// vault keeps its strong ones.
+    pub fn recommended_like(like: &KdfParams) -> Result<Self> {
+        let mut salt = [0u8; SALT_LEN];
+        fill_random(&mut salt)?;
+        Ok(Self {
+            m_cost_kib: like.m_cost_kib,
+            t_cost: like.t_cost,
+            p_cost: like.p_cost,
+            salt,
+        })
+    }
+
     /// Explicit parameters. Rejects memory costs below [`Self::MIN_M_COST_KIB`]
     /// and zero passes or lanes. Tests that need to be fast should use
     /// [`KdfParams::insecure_for_tests`] instead of lying about production.

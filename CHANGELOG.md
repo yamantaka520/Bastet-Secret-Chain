@@ -169,6 +169,18 @@ release exists. Until then every change lands under `Unreleased`.
   `external:telegram:<user id>`. New `Actor::External` in the store and a
   `ChannelNotifier` that feeds an async channel without blocking the ticker.
 
+- **M6 step 4 — lifecycle**: `POST /v1/vault/passphrase` rotates the
+  passphrase in one transaction (rewrap every DEK, re-encrypt names/paths/
+  tags/use bindings/token labels/scopes/session scopes, rebuild the blind
+  index, new verifier; sessions ended); `DELETE /v1/items/{sref}` hard-deletes
+  an item while approvals and the ledger keep its history (`approval.item_id`
+  is no longer a foreign key for that reason); `GET/POST /v1/grants` and
+  `DELETE /v1/grants/{tok}/{sref}` pre-authorize and revoke; `rotation_days`
+  with a derived `rotation_due_at` and a 🔄 badge. UI: change-passphrase card,
+  delete button, rotation field, pre-authorization panel on the tokens page.
+  New ledger actions `passphrase_rotated`, `item_deleted`, `grant_issued`,
+  `grant_revoked`.
+
 ### Status
 
 - M5 gate met on 2026-09-04 with Codex CLI and then Claude Code; Agy and

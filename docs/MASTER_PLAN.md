@@ -257,7 +257,7 @@ recorded in this repository and mirrored to BastetMind.
 | M3 | complete, 2026-09-03 — 82 tests, three-platform CI run `33769473982`; e2e gate met by an API-level substitute plus a recorded manual browser pass | [`M3_VALIDATION.md`](M3_VALIDATION.md) |
 | M4 | delivered 2026-09-04 — 95 tests, CI run `33777806776` with three release artifacts; LaunchAgent install / kill-restart / uninstall observed on a real Mac; **reboot itself not performed on any platform** | [`M4_VALIDATION.md`](M4_VALIDATION.md) |
 | M5 | complete, 2026-09-04 — real Codex CLI and Claude Code runs through `bsc mcp` each crossed a token renewal and a human approval; recipes for Claude Code / Codex / Agy / scripts | [`M5_VALIDATION.md`](M5_VALIDATION.md), [`AGENT_INTEGRATION.md`](AGENT_INTEGRATION.md) |
-| M6 | in progress — step 1 unattended unseal (2026-09-04), step 2 `use_secret` (2026-09-04); rotation, pre-authorization, external channel, anchoring, export pending | — |
+| M6 | in progress — ① unattended unseal, ② `use_secret`, ③ Telegram approval channel, ④ pre-authorization grants, rotation cadence, passphrase rotation, item deletion (all 2026-09-04); ⑤ audit-head anchoring and break-glass export pending | — |
 | M7 | not started | — |
 
 ## 7. Open questions

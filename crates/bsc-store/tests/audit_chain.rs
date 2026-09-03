@@ -35,6 +35,7 @@ fn populated() -> (TempDir, std::path::PathBuf) {
                     env: None,
                     approval_required: None,
                     expires_at: None,
+                    rotation_days: None,
                 },
                 b"body",
                 &human(),

@@ -118,6 +118,7 @@ export function Badges({ i, t }: { i: Item; t: T }) {
       {i.approval_required && <span className="badge bad">🔴 {t("approval_required")}</span>}
       {i.local_approval_only && <span className="badge info">🏠 {t("local_only")}</span>}
       {i.has_use_binding && <span className="badge ok">🔗 {t("use_badge")}</span>}
+      {i.rotation_due_at && (secondsUntil(i.rotation_due_at) ?? 1) <= 0 && <span className="badge warn">🔄 {t("rotation_due")}</span>}
       {s !== null && s <= 0 && <span className="badge bad">⛔ {t("expired")}</span>}
       {s !== null && s > 0 && isExpiringSoon(i.expires_at) && <span className="badge warn">⏰ {t("expiring")}</span>}
     </>

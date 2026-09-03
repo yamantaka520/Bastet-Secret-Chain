@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { Key } from "../i18n";
-import type { Token } from "../types";
+import type { Grant, Item, Token } from "../types";
 import { copyText, fmtTime, parseList, secondsUntil, fmtDuration } from "../util";
 import { useToast } from "./Toast";
 
@@ -9,6 +9,11 @@ type T = (k: Key, v?: Record<string, string | number>) => string;
 
 export default function Tokens({ t, refreshKey, refresh, presetPath }: { t: T; refreshKey: number; refresh: () => void; presetPath?: string }) {
   const [tokens, setTokens] = useState<Token[]>([]);
+  const [grants, setGrants] = useState<Grant[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [gTok, setGTok] = useState("");
+  const [gItem, setGItem] = useState("");
+  const [gTtl, setGTtl] = useState(1800);
   const [minting, setMinting] = useState(!!presetPath);
   const [minted, setMinted] = useState<Token | null>(null);
   const [label, setLabel] = useState("");
@@ -19,7 +24,7 @@ export default function Tokens({ t, refreshKey, refresh, presetPath }: { t: T; r
   const [rate, setRate] = useState(60);
   const toast = useToast();
 
-  async function load() { try { setTokens((await api.tokens()).tokens); } catch { /* */ } }
+  async function load() { try { setTokens((await api.tokens()).tokens); setGrants((await api.grants()).grants); setItems((await api.items()).items.filter((i) => i.approval_required)); } catch { /* */ } }
   useEffect(() => { load(); const i = setInterval(load, 10_000); return () => clearInterval(i); }, [refreshKey]);
 
   async function mint() {
@@ -54,6 +59,28 @@ export default function Tokens({ t, refreshKey, refresh, presetPath }: { t: T; r
           })}
         </tbody>
       </table>
+
+      <h3 style={{ marginTop: 28 }}>🎟️ {t("grants_title")}</h3>
+      <p className="muted small">{t("grant_hint")}</p>
+      <div className="card" style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap", marginBottom: 12 }}>
+        <div className="field" style={{ margin: 0, flex: 1 }}><label>{t("grant_token")}</label>
+          <select value={gTok} onChange={(e) => setGTok(e.target.value)}><option value="">—</option>{tokens.filter((k) => k.live).map((k) => <option key={k.id} value={k.id}>{k.label ?? k.id}</option>)}</select></div>
+        <div className="field" style={{ margin: 0, flex: 1 }}><label>{t("grant_item")}</label>
+          <select value={gItem} onChange={(e) => setGItem(e.target.value)}><option value="">—</option>{items.map((i) => <option key={i.sref} value={i.sref}>{i.name ?? i.sref} · {i.path}</option>)}</select></div>
+        <div className="field" style={{ margin: 0 }}><label>{t("grant_ttl")}</label>
+          <select value={gTtl} onChange={(e) => setGTtl(Number(e.target.value))}><option value={900}>15 min</option><option value={1800}>30 min</option><option value={3600}>1 h</option><option value={7200}>2 h</option><option value={28800}>8 h</option></select></div>
+        <button className="btn primary" disabled={!gTok || !gItem} onClick={async () => { try { await api.grant(gTok, gItem, gTtl); setGTok(""); setGItem(""); load(); refresh(); } catch (e) { toast({ title: t("error_generic"), body: String(e), bad: true }); } }}>🎟️ {t("grant_new")}</button>
+      </div>
+      {grants.length === 0 ? <div className="muted small">{t("no_grants")}</div> : (
+        <table><thead><tr><th>{t("grant_token")}</th><th>{t("grant_item")}</th><th>source</th><th>{t("grant_until")}</th><th></th></tr></thead><tbody>
+          {grants.map((g) => (
+            <tr key={g.token_id + g.sref}><td><strong>{g.token_label ?? g.token_id}</strong></td><td>{g.item_name ?? g.sref}</td>
+              <td><span className={`badge ${g.source === "pre-authorized" ? "info" : "ok"}`}>{g.source === "pre-authorized" ? t("grant_source_pre") : t("grant_source_approval")}</span></td>
+              <td className="small">{fmtTime(g.until)} <span className="muted">({fmtDuration(Math.max(0, secondsUntil(g.until) ?? 0))})</span></td>
+              <td><button className="btn sm danger" onClick={async () => { await api.revokeGrant(g.token_id, g.sref); load(); refresh(); }}>{t("grant_revoke")}</button></td></tr>
+          ))}
+        </tbody></table>
+      )}
 
       {minting && (
         <div className="overlay center" onClick={() => setMinting(false)}>

@@ -1,4 +1,4 @@
-import type { ApiError, Approval, AuditRecord, Item, Scope, Session, Status, Token } from "./types";
+import type { ApiError, Approval, AuditRecord, Grant, Item, Scope, Session, Status, Token } from "./types";
 
 export class ApiFailure extends Error {
   constructor(public status: number, public body: ApiError) {
@@ -23,12 +23,17 @@ export const api = {
   status: () => call<Status>("GET", "/v1/vault/status"),
   unseal: (passphrase: string) => call<{ sealed: boolean }>("POST", "/v1/vault/unseal", { passphrase }),
   seal: () => call<{ sealed: boolean }>("POST", "/v1/vault/seal"),
+  changePassphrase: (current: string, next: string) => call<{ rotated: boolean }>("POST", "/v1/vault/passphrase", { current, new: next }),
+  deleteItem: (sref: string, reason: string) => call<{ deleted: boolean }>("DELETE", `/v1/items/${sref}`, { reason }),
+  grants: () => call<{ grants: Grant[] }>("GET", "/v1/grants"),
+  grant: (token_id: string, sref: string, ttl_seconds: number) => call<{ until: string }>("POST", "/v1/grants", { token_id, sref, ttl_seconds }),
+  revokeGrant: (token_id: string, sref: string) => call<{ revoked: boolean }>("DELETE", `/v1/grants/${token_id}/${sref}`),
 
   items: () => call<{ items: Item[]; sealed: boolean }>("GET", "/v1/items"),
   item: (sref: string) => call<Item>("GET", `/v1/items/${sref}`),
   createItem: (b: {
     path: string; name: string; type: string; tags: string[]; env: string | null;
-    approval_required?: boolean; expires_at?: number | null; value?: string; value_base64?: string;
+    approval_required?: boolean; expires_at?: number | null; rotation_days?: number | null; value?: string; value_base64?: string;
   }) => call<Item>("POST", "/v1/items", b),
   patchItem: (sref: string, b: Record<string, unknown>) => call<Item>("PATCH", `/v1/items/${sref}`, b),
   addVersion: (sref: string, b: { value?: string; value_base64?: string; note?: string }) =>

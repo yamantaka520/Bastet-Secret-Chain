@@ -59,6 +59,7 @@ impl Fx {
                     env: None,
                     approval_required: None,
                     expires_at: None,
+                    rotation_days: None,
                 },
                 b"body",
                 &human(),
@@ -457,6 +458,7 @@ fn item_flags_update_and_default_local_only_is_false() {
             Some(true),
             Some(Some(T0 + 86_400)),
             Some(Some("prod".into())),
+            None,
             &human(),
         )
         .unwrap();
@@ -465,7 +467,7 @@ fn item_flags_update_and_default_local_only_is_false() {
     assert_eq!(m.expires_at, Some(T0 + 86_400));
     assert_eq!(m.env.as_deref(), Some("prod"));
     let m =
-        fx.v.set_item_flags(&item, None, None, Some(None), None, &human())
+        fx.v.set_item_flags(&item, None, None, Some(None), None, None, &human())
             .unwrap();
     assert_eq!(m.expires_at, None);
     assert!(m.approval_required, "untouched fields stay");

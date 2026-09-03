@@ -128,6 +128,9 @@ pub struct NewItem {
     pub approval_required: Option<bool>,
     /// Unix seconds. Stored in the clear so expiry can be listed while sealed.
     pub expires_at: Option<i64>,
+    /// Rotate every N days; the UI flags the item once `updated + N days` has
+    /// passed. Stored in the clear.
+    pub rotation_days: Option<u32>,
 }
 
 /// Metadata visible while the vault is sealed.
@@ -153,10 +156,20 @@ pub struct ItemMeta {
     /// Whether a `use_secret` binding exists (the binding itself is encrypted
     /// and only available through `ItemDetail`).
     pub has_use_binding: bool,
+    /// Rotation cadence in days, if set.
+    pub rotation_days: Option<u32>,
     /// Highest version number.
     pub current_version: u32,
     /// Plaintext size of the current version in bytes.
     pub size: u64,
+}
+
+impl ItemMeta {
+    /// Unix seconds at which rotation is due, if a cadence is set.
+    pub fn rotation_due_at(&self) -> Option<i64> {
+        self.rotation_days
+            .map(|d| self.updated + i64::from(d) * 86_400)
+    }
 }
 
 /// Everything about an item except its body. Requires an unsealed vault.

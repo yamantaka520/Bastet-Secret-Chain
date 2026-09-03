@@ -181,6 +181,28 @@ pub fn open_body(
     decrypt(&dek.0, &aad.to_bytes(), body)
 }
 
+/// Re-wrap a version's data key under a new KEK without touching the body.
+/// The wrap binds the same identity (`aad` with the `/dek` suffix), so a
+/// rewrapped key still only opens its own item and version.
+pub fn rewrap_dek(
+    old_kek: &Kek,
+    new_kek: &Kek,
+    aad: &Aad<'_>,
+    wrapped: &WrappedDek,
+) -> Result<WrappedDek> {
+    let wrap_aad = Aad {
+        field: &format!("{}/dek", aad.field),
+        ..*aad
+    };
+    let sealed = Sealed::from_slice(&wrapped.0)?;
+    let dek_bytes = decrypt(old_kek.as_bytes(), &wrap_aad.to_bytes(), &sealed)?;
+    if dek_bytes.len() != KEY_LEN {
+        return Err(CryptoError::Decrypt);
+    }
+    let rewrapped = encrypt(new_kek.as_bytes(), &wrap_aad.to_bytes(), &dek_bytes)?;
+    Ok(WrappedDek(rewrapped.to_vec()))
+}
+
 /// Encrypt a small metadata field (name, path, tag, note) directly under the
 /// KEK. No per-field data key: rotating the passphrase re-encrypts these,
 /// which is cheap because they are small.

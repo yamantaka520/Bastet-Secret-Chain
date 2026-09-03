@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api, ApiFailure } from "../api";
 import type { Key } from "../i18n";
 import type { AuditRecord, Item } from "../types";
-import { bytes, copyText, emoji, fileToBase64, fmtTime, fmtWhen } from "../util";
+import { bytes, copyText, emoji, fileToBase64, fmtTime, fmtWhen, secondsUntil } from "../util";
 import { useToast } from "./Toast";
 import { Badges } from "./Items";
 
@@ -84,6 +84,7 @@ export default function ItemDrawer({ t, sref, onClose, onChanged }: { t: T; sref
               <dt>{t("created")}</dt><dd>{fmtTime(item.created)}</dd>
               <dt>{t("updated")}</dt><dd>{fmtTime(item.updated)}</dd>
               <dt>{t("expires")}</dt><dd>{item.expires_at ? fmtTime(item.expires_at) : t("never")}</dd>
+              <dt>🔄 {t("rotation_days")}</dt><dd><input type="number" min={1} style={{ width: 90, display: "inline-block", padding: "2px 8px" }} defaultValue={item.rotation_days ?? ""} onBlur={(e) => patch({ rotation_days: e.target.value ? Number(e.target.value) : null })} /> {item.rotation_due_at && <span className={`badge ${(secondsUntil(item.rotation_due_at) ?? 1) <= 0 ? "warn" : ""}`}>{(secondsUntil(item.rotation_due_at) ?? 1) <= 0 ? t("rotation_due") : t("rotation_due_in", { d: Math.ceil((secondsUntil(item.rotation_due_at) ?? 0) / 86400) })}</span>}</dd>
             </dl>
             <div style={{ display: "flex", gap: 14, margin: "14px 0", flexWrap: "wrap" }}>
               <label style={{ display: "flex", gap: 6, alignItems: "center", color: "inherit" }}>
@@ -96,6 +97,11 @@ export default function ItemDrawer({ t, sref, onClose, onChanged }: { t: T; sref
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn" onClick={() => copyText(`${location.origin}/v1/secrets/${item.sref}`).then(() => toast({ title: `📋 ${t("copied_title")}`, body: t("copied_body") }))}>📋 {t("copy_ref")}</button>
               <button className="btn primary" onClick={() => doReveal()}>👁 {t("reveal")}</button>
+              <button className="btn danger" style={{ marginLeft: "auto" }} onClick={async () => {
+                if (!confirm(t("delete_confirm", { name: item.name ?? item.sref }))) return;
+                const reason = prompt(t("delete_reason")) ?? "";
+                try { await api.deleteItem(sref, reason); toast({ title: `🗑️ ${t("deleted")}` }); onChanged(); onClose(); } catch (e) { toast({ title: t("error_generic"), body: String(e), bad: true }); }
+              }}>🗑️ {t("delete_item")}</button>
             </div>
             {needPw && (
               <div className="card" style={{ marginTop: 14 }}>

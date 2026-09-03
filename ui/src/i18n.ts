@@ -40,6 +40,10 @@ const zh = {
   use_tab: "使用綁定", use_hint: "讓 Agent 「用」這把憑證而不「看」它:保險庫代為對下列 URL 發出請求並注入 header。留空 = 不允許 use_secret。",
   use_urls: "允許的 URL 樣式 (每行一個,https:// 開頭,結尾 * 表示前綴)", use_header: "注入的 header 模板 ({value} 會被替換)", use_methods: "允許的方法",
   use_save: "儲存綁定", use_clear: "清除綁定", use_saved: "使用綁定已更新", use_badge: "可代發",
+  rotation_days: "輪替週期 (天,選填)", rotation_due: "輪替逾期", rotation_due_in: "{d} 天後該輪替",
+  delete_item: "刪除項目", delete_confirm: "確定刪除「{name}」?密文會被移除,稽核紀錄保留。", delete_reason: "刪除原因", deleted: "已刪除",
+  grants_title: "預先授權", grant_new: "預先授權", grant_hint: "讓某把 token 在指定時間內讀取某個需核准的項目而不再提示。到期不會自動延長。", grant_token: "Token", grant_item: "項目", grant_ttl: "有效時間", grant_source_pre: "預先授權", grant_source_approval: "核准後", grant_until: "有效至", grant_revoke: "撤回", no_grants: "目前沒有有效的授權。",
+  change_pw: "更換密語", current_pw: "目前密語", new_pw: "新密語 (至少 12 字元)", change_pw_hint: "會重新包封所有資料金鑰並重建索引;其他登入會被登出。", pw_changed: "密語已更換,請重新登入。",
 };
 
 const en: typeof zh = {
@@ -82,6 +86,10 @@ const en: typeof zh = {
   use_tab: "Use binding", use_hint: "Let an agent USE this credential without SEEING it: the vault sends requests to the URLs below with the header injected. Empty = use_secret not allowed.",
   use_urls: "Allowed URL patterns (one per line, https://, trailing * = prefix)", use_header: "Injected header template ({value} is replaced)", use_methods: "Allowed methods",
   use_save: "Save binding", use_clear: "Clear binding", use_saved: "Use binding updated", use_badge: "Usable",
+  rotation_days: "Rotation cadence (days, optional)", rotation_due: "Rotation overdue", rotation_due_in: "rotate in {d} d",
+  delete_item: "Delete item", delete_confirm: "Delete “{name}”? The ciphertext is removed; the ledger keeps its history.", delete_reason: "Reason", deleted: "Deleted",
+  grants_title: "Pre-authorizations", grant_new: "Pre-authorize", grant_hint: "Let a token read an approval-required item for a while without prompting. It never extends itself.", grant_token: "Token", grant_item: "Item", grant_ttl: "Duration", grant_source_pre: "pre-authorized", grant_source_approval: "from approval", grant_until: "Until", grant_revoke: "Revoke", no_grants: "No live grants.",
+  change_pw: "Change passphrase", current_pw: "Current passphrase", new_pw: "New passphrase (12+ characters)", change_pw_hint: "Rewraps every data key and rebuilds the index; other sessions are logged out.", pw_changed: "Passphrase changed — log in again.",
 };
 
 export type Key = keyof typeof zh;

@@ -54,11 +54,14 @@ pub fn app(state: Arc<AppState>) -> Router {
         // ---- human surface
         .route("/v1/vault/unseal", post(human::unseal))
         .route("/v1/vault/seal", post(human::seal))
+        .route("/v1/vault/passphrase", post(human::change_passphrase))
         .route("/v1/vault/status", get(human::status))
         .route("/v1/items", get(human::list_items).post(human::create_item))
         .route(
             "/v1/items/:sref",
-            get(human::item_detail).patch(human::patch_item),
+            get(human::item_detail)
+                .patch(human::patch_item)
+                .delete(human::delete_item),
         )
         .route("/v1/items/:sref/versions", post(human::add_version))
         .route(
@@ -76,6 +79,11 @@ pub fn app(state: Arc<AppState>) -> Router {
             get(human::list_sessions).post(human::open_session),
         )
         .route("/v1/sessions/:ses", delete(human::close_session))
+        .route(
+            "/v1/grants",
+            get(human::list_grants).post(human::create_grant),
+        )
+        .route("/v1/grants/:tok/:sref", delete(human::revoke_grant))
         .route("/v1/approvals", get(human::list_approvals))
         .route("/v1/approvals/:apr/approve", post(human::approve))
         .route("/v1/approvals/:apr/deny", post(human::deny))

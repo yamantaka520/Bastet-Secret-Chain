@@ -157,6 +157,19 @@ impl SessionRecord {
     }
 }
 
+/// A live trust-on-first-use or pre-authorized grant.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GrantRecord {
+    /// Token that may read without a prompt.
+    pub token_id: String,
+    /// Item it may read.
+    pub item_id: String,
+    /// `apr_…` that created it, or `"pre"` for pre-authorization.
+    pub approval_id: String,
+    /// Unix seconds.
+    pub expires_at: i64,
+}
+
 /// Approval lifecycle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ApprovalStatus {
@@ -802,6 +815,82 @@ impl Vault {
             params![id, now],
         )?;
         Ok(n == 1)
+    }
+
+    /// Pre-authorize: a human grants a token access to an item ahead of any
+    /// request (ADR 0005 §1, pre-authorization). Same grant row an approval
+    /// would create, with `approval_id = "pre"`; capped at the token's expiry.
+    pub fn grant_direct(
+        &mut self,
+        token_id: &str,
+        item_id: &str,
+        ttl: i64,
+        actor: &Actor,
+    ) -> Result<i64> {
+        if ttl <= 0 {
+            return Err(StoreError::Invalid("grant ttl must be positive"));
+        }
+        let token = self.token(token_id)?;
+        self.meta(item_id)?;
+        let now = self.now();
+        let until = (now + ttl).min(token.expires_at);
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
+            "INSERT INTO access_grant (token_id, item_id, approval_id, expires_at) VALUES (?1, ?2, 'pre', ?3)
+             ON CONFLICT(token_id, item_id) DO UPDATE SET approval_id = 'pre', expires_at = excluded.expires_at",
+            params![token_id, item_id, until],
+        )?;
+        audit::append(
+            &tx,
+            now,
+            &actor.label(),
+            "grant_issued",
+            Some(item_id),
+            "ok",
+            &serde_json::json!({ "token_id": token_id, "until": until }).to_string(),
+        )?;
+        tx.commit()?;
+        Ok(until)
+    }
+
+    /// Revoke a grant (pre-authorized or from an approval) before it expires.
+    pub fn revoke_grant(&mut self, token_id: &str, item_id: &str, actor: &Actor) -> Result<bool> {
+        let now = self.now();
+        let tx = self.conn.unchecked_transaction()?;
+        let n = tx.execute(
+            "DELETE FROM access_grant WHERE token_id = ?1 AND item_id = ?2",
+            params![token_id, item_id],
+        )?;
+        if n > 0 {
+            audit::append(
+                &tx,
+                now,
+                &actor.label(),
+                "grant_revoked",
+                Some(item_id),
+                "ok",
+                &serde_json::json!({ "token_id": token_id }).to_string(),
+            )?;
+        }
+        tx.commit()?;
+        Ok(n > 0)
+    }
+
+    /// Live grants, soonest expiry first.
+    pub fn active_grants(&self) -> Result<Vec<GrantRecord>> {
+        let now = self.now();
+        let mut stmt = self.conn.prepare(
+            "SELECT token_id, item_id, approval_id, expires_at FROM access_grant WHERE expires_at > ?1 ORDER BY expires_at",
+        )?;
+        let rows = stmt.query_map([now], |r| {
+            Ok(GrantRecord {
+                token_id: r.get(0)?,
+                item_id: r.get(1)?,
+                approval_id: r.get(2)?,
+                expires_at: r.get(3)?,
+            })
+        })?;
+        Ok(rows.collect::<std::result::Result<_, _>>()?)
     }
 
     /// Whether an unexpired grant exists for this token and item.

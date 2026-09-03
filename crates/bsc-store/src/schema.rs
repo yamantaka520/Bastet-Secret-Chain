@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS item (
     approval_required INTEGER NOT NULL,
     local_approval_only INTEGER NOT NULL DEFAULT 0,
     use_ct            BLOB,
+    rotation_days     INTEGER,
     current_version   INTEGER NOT NULL,
     path_ct           BLOB NOT NULL,
     name_ct           BLOB NOT NULL,
@@ -97,11 +98,13 @@ CREATE TABLE IF NOT EXISTS session (
     opened_by  TEXT NOT NULL
 );
 
--- Pending / decided approval requests (ADR 0005 §2–3).
+-- Pending / decided approval requests (ADR 0005 §2–3). Deliberately no
+-- foreign key on item_id: an approval is history and must outlive the item
+-- it was about (items can be deleted; approvals, like the ledger, are not).
 CREATE TABLE IF NOT EXISTS approval (
     id           TEXT PRIMARY KEY,
     token_id     TEXT NOT NULL REFERENCES token(id),
-    item_id      TEXT NOT NULL REFERENCES item(id),
+    item_id      TEXT NOT NULL,
     reason       TEXT NOT NULL,
     requested_at INTEGER NOT NULL,
     expires_at   INTEGER NOT NULL,
@@ -117,7 +120,7 @@ CREATE INDEX IF NOT EXISTS approval_pending ON approval(status, expires_at);
 -- prompt until expires_at.
 CREATE TABLE IF NOT EXISTS access_grant (
     token_id    TEXT NOT NULL REFERENCES token(id),
-    item_id     TEXT NOT NULL REFERENCES item(id),
+    item_id     TEXT NOT NULL REFERENCES item(id) ON DELETE CASCADE,
     approval_id TEXT NOT NULL,
     expires_at  INTEGER NOT NULL,
     PRIMARY KEY (token_id, item_id)

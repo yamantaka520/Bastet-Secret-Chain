@@ -16,6 +16,7 @@ export interface UseBinding { urls: string[]; header: string; methods: string[] 
 export interface Item {
   sref: string; type: ItemType; env: string | null;
   has_use_binding?: boolean; use_binding?: UseBinding | null;
+  rotation_days?: number | null; rotation_due_at?: string | null;
   created: string; updated: string; expires_at: string | null;
   approval_required: boolean; local_approval_only: boolean;
   version: number; size: number;
@@ -35,6 +36,8 @@ export interface Session {
   id: string; scope: Scope | null; opened: string; expires_at: string;
   closed_at: string | null; active: boolean; seconds_left: number;
 }
+
+export interface Grant { token_id: string; token_label: string | null; sref: string; item_name: string | null; source: string; approval_id: string | null; until: string }
 
 export interface Approval {
   id: string; token_id: string; sref: string; reason: string; requested_at: string;

@@ -428,8 +428,8 @@ impl Vault {
         let tx = self.conn.unchecked_transaction()?;
         tx.execute(
             "INSERT INTO item (id, item_type, env, created, updated, expires_at, approval_required,
-                               local_approval_only, current_version, path_ct, name_ct, tags_ct)
-             VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6, 0, 1, ?7, ?8, ?9)",
+                               local_approval_only, rotation_days, current_version, path_ct, name_ct, tags_ct)
+             VALUES (?1, ?2, ?3, ?4, ?4, ?5, ?6, 0, ?10, 1, ?7, ?8, ?9)",
             params![
                 id,
                 new.item_type.as_str(),
@@ -440,6 +440,7 @@ impl Vault {
                 path_ct.to_vec(),
                 name_ct.to_vec(),
                 tags_ct.to_vec(),
+                new.rotation_days,
             ],
         )?;
         tx.execute(
@@ -674,6 +675,7 @@ impl Vault {
             approval_required: row.get::<_, i64>(6)? != 0,
             local_approval_only: row.get::<_, i64>(9)? != 0,
             has_use_binding: row.get::<_, i64>(10)? != 0,
+            rotation_days: row.get::<_, Option<i64>>(11)?.map(|d| d as u32),
             current_version: row.get(7)?,
             size: row.get::<_, i64>(8)? as u64,
         })
@@ -681,7 +683,7 @@ impl Vault {
 
     const META_SELECT: &'static str =
         "SELECT i.id, i.item_type, i.env, i.created, i.updated, i.expires_at,
-                i.approval_required, i.current_version, v.size, i.local_approval_only, (i.use_ct IS NOT NULL)
+                i.approval_required, i.current_version, v.size, i.local_approval_only, (i.use_ct IS NOT NULL), i.rotation_days
          FROM item i JOIN version v ON v.item_id = i.id AND v.n = i.current_version";
 
     /// Clear metadata for every item. Works while sealed.
@@ -869,6 +871,9 @@ impl Vault {
 
     /// Update clear metadata flags. Each `Some` is applied; `None` leaves the
     /// column alone. `expires_at: Some(None)` clears the expiry.
+    // One optional argument per PATCH field; the HTTP shape maps 1:1 and a
+    // struct would only rename the same seven knobs.
+    #[allow(clippy::too_many_arguments)]
     pub fn set_item_flags(
         &mut self,
         id: &str,
@@ -876,6 +881,7 @@ impl Vault {
         local_approval_only: Option<bool>,
         expires_at: Option<Option<i64>>,
         env: Option<Option<String>>,
+        rotation_days: Option<Option<u32>>,
         actor: &Actor,
     ) -> Result<ItemMeta> {
         self.meta(id)?;
@@ -905,6 +911,13 @@ impl Vault {
                 params![id, v, ts],
             )?;
         }
+        if let Some(v) = rotation_days {
+            // Cadence changes do not count as a rotation, so `updated` stays.
+            tx.execute(
+                "UPDATE item SET rotation_days = ?2 WHERE id = ?1",
+                params![id, v.map(i64::from)],
+            )?;
+        }
         audit::append(
             &tx,
             ts,
@@ -917,11 +930,214 @@ impl Vault {
                 "local_approval_only": local_approval_only,
                 "expires_at": expires_at,
                 "env": env,
+                "rotation_days": rotation_days,
             })
             .to_string(),
         )?;
         tx.commit()?;
         self.meta(id)
+    }
+
+    /// Remove an item and everything that hangs off it: versions, blind-index
+    /// rows, grants, pending approvals. Hard delete — the ciphertext is gone;
+    /// the ledger keeps `item_created`, every read, and this `item_deleted`.
+    /// Requires an unsealed vault so the deleter has proven who they are.
+    pub fn delete_item(&mut self, id: &str, actor: &Actor, reason: &str) -> Result<()> {
+        self.keys()?;
+        let meta = self.meta(id)?;
+        let ts = self.now();
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM access_grant WHERE item_id = ?1", [id])?;
+        tx.execute(
+            "UPDATE approval SET status = 'denied', decided_at = ?2, decided_by = ?3 WHERE item_id = ?1 AND status = 'pending'",
+            params![id, ts, actor.label()],
+        )?;
+        tx.execute("DELETE FROM blind_index WHERE item_id = ?1", [id])?;
+        tx.execute("DELETE FROM version WHERE item_id = ?1", [id])?;
+        tx.execute("DELETE FROM item WHERE id = ?1", [id])?;
+        audit::append(
+            &tx,
+            ts,
+            &actor.label(),
+            "item_deleted",
+            Some(id),
+            "ok",
+            &serde_json::json!({ "type": meta.item_type.as_str(), "versions": meta.current_version, "reason": reason }).to_string(),
+        )?;
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Change the passphrase. Derives a new KEK under fresh Argon2id
+    /// parameters and salt, then — in one transaction — rewraps every
+    /// version's DEK, re-encrypts every KEK-direct field (item path/name/tags/
+    /// use, token label/scope, session scope), rebuilds the blind index under
+    /// the new index key, and replaces the header verifier. Item bodies are
+    /// not touched: that is what the envelope is for.
+    pub fn rotate_passphrase(
+        &mut self,
+        current: &[u8],
+        new_passphrase: &[u8],
+        actor: &Actor,
+    ) -> Result<()> {
+        use bsc_crypto::envelope::{open_body, open_field, seal_field, WrappedDek};
+        if new_passphrase.is_empty() {
+            return Err(StoreError::Invalid("empty passphrase"));
+        }
+        let old_kek = Kek::derive(current, &self.params)?;
+        if !envelope::check_verifier(&old_kek, &self.verifier) {
+            self.audit_now(
+                actor,
+                "passphrase_rotated",
+                None,
+                "denied",
+                serde_json::json!({}),
+            )?;
+            return Err(StoreError::BadPassphrase);
+        }
+        let new_params = KdfParams::recommended_like(&self.params)?;
+        let new_kek = Kek::derive(new_passphrase, &new_params)?;
+        let new_index = IndexKey::derive(&new_kek);
+        let new_verifier = envelope::make_verifier(&new_kek)?;
+        let ts = self.now();
+
+        let tx = self.conn.unchecked_transaction()?;
+
+        // 1. Versions: unwrap DEK under old, rewrap under new. Bodies untouched.
+        {
+            let mut stmt = tx.prepare("SELECT item_id, n, wrapped_dek FROM version")?;
+            let rows: Vec<(String, u32, Vec<u8>)> = stmt
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+                .collect::<std::result::Result<_, _>>()?;
+            for (item_id, n, wrapped) in rows {
+                let aad = Aad {
+                    item_id: &item_id,
+                    version: n,
+                    field: "body",
+                };
+                let rewrapped = envelope::rewrap_dek(
+                    &old_kek,
+                    &new_kek,
+                    &aad,
+                    &WrappedDek::from_bytes(wrapped),
+                )?;
+                tx.execute(
+                    "UPDATE version SET wrapped_dek = ?3 WHERE item_id = ?1 AND n = ?2",
+                    params![item_id, n, rewrapped.as_bytes()],
+                )?;
+            }
+            let _ = open_body; // documented above: bodies are not re-encrypted
+        }
+        // 2. Items: path/name/tags/use fields and the blind index.
+        {
+            let mut stmt = tx.prepare("SELECT id, path_ct, name_ct, tags_ct, use_ct FROM item")?;
+            type ItemRow = (String, Vec<u8>, Vec<u8>, Vec<u8>, Option<Vec<u8>>);
+            let rows: Vec<ItemRow> = stmt
+                .query_map([], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+                })?
+                .collect::<std::result::Result<_, _>>()?;
+            for (id, path_ct, name_ct, tags_ct, use_ct) in rows {
+                let re =
+                    |field: &'static str, ct: &[u8]| -> Result<(Vec<u8>, Zeroizing<Vec<u8>>)> {
+                        let aad = Aad {
+                            item_id: &id,
+                            version: 0,
+                            field,
+                        };
+                        let pt = open_field(&old_kek, &aad, &Sealed::from_slice(ct)?)?;
+                        Ok((seal_field(&new_kek, &aad, &pt)?.to_vec(), pt))
+                    };
+                let (path_new, path_pt) = re("path", &path_ct)?;
+                let (name_new, name_pt) = re("name", &name_ct)?;
+                let (tags_new, tags_pt) = re("tags", &tags_ct)?;
+                let use_new = match use_ct {
+                    Some(ct) => Some(re("use", &ct)?.0),
+                    None => None,
+                };
+                tx.execute(
+                    "UPDATE item SET path_ct = ?2, name_ct = ?3, tags_ct = ?4, use_ct = ?5 WHERE id = ?1",
+                    params![id, path_new, name_new, tags_new, use_new],
+                )?;
+                tx.execute("DELETE FROM blind_index WHERE item_id = ?1", [&id])?;
+                let name = String::from_utf8_lossy(&name_pt).to_string();
+                let path = String::from_utf8_lossy(&path_pt).to_string();
+                let tags: Vec<String> = serde_json::from_slice(&tags_pt).unwrap_or_default();
+                for t in new_index.tags("name", &name) {
+                    tx.execute("INSERT OR IGNORE INTO blind_index (item_id, field, tag) VALUES (?1, 'name', ?2)", params![id, t.as_slice()])?;
+                }
+                for t in new_index.tags("path", &path) {
+                    tx.execute("INSERT OR IGNORE INTO blind_index (item_id, field, tag) VALUES (?1, 'path', ?2)", params![id, t.as_slice()])?;
+                }
+                for tag in &tags {
+                    for t in new_index.tags("tags", tag) {
+                        tx.execute("INSERT OR IGNORE INTO blind_index (item_id, field, tag) VALUES (?1, 'tags', ?2)", params![id, t.as_slice()])?;
+                    }
+                }
+            }
+        }
+        // 3. Tokens and sessions: label / scope fields.
+        {
+            let mut stmt = tx.prepare("SELECT id, label_ct, scope_ct FROM token")?;
+            let rows: Vec<(String, Vec<u8>, Vec<u8>)> = stmt
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+                .collect::<std::result::Result<_, _>>()?;
+            for (id, label_ct, scope_ct) in rows {
+                let re = |field: &'static str, ct: &[u8]| -> Result<Vec<u8>> {
+                    let aad = Aad {
+                        item_id: &id,
+                        version: 0,
+                        field,
+                    };
+                    let pt = open_field(&old_kek, &aad, &Sealed::from_slice(ct)?)?;
+                    Ok(seal_field(&new_kek, &aad, &pt)?.to_vec())
+                };
+                tx.execute(
+                    "UPDATE token SET label_ct = ?2, scope_ct = ?3 WHERE id = ?1",
+                    params![id, re("label", &label_ct)?, re("scope", &scope_ct)?],
+                )?;
+            }
+            let mut stmt = tx.prepare("SELECT id, scope_ct FROM session")?;
+            let rows: Vec<(String, Vec<u8>)> = stmt
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<std::result::Result<_, _>>()?;
+            for (id, scope_ct) in rows {
+                let aad = Aad {
+                    item_id: &id,
+                    version: 0,
+                    field: "scope",
+                };
+                let pt = open_field(&old_kek, &aad, &Sealed::from_slice(&scope_ct)?)?;
+                tx.execute(
+                    "UPDATE session SET scope_ct = ?2 WHERE id = ?1",
+                    params![id, seal_field(&new_kek, &aad, &pt)?.to_vec()],
+                )?;
+            }
+        }
+        // 4. Header.
+        set_meta(&tx, "kdf_m_cost_kib", &new_params.m_cost_kib.to_string())?;
+        set_meta(&tx, "kdf_t_cost", &new_params.t_cost.to_string())?;
+        set_meta(&tx, "kdf_p_cost", &new_params.p_cost.to_string())?;
+        set_meta(&tx, "kdf_salt", &hex::encode(new_params.salt))?;
+        set_meta(&tx, "verifier", &hex::encode(new_verifier.to_vec()))?;
+        audit::append(
+            &tx,
+            ts,
+            &actor.label(),
+            "passphrase_rotated",
+            None,
+            "ok",
+            &serde_json::json!({ "kdf": { "m_cost_kib": new_params.m_cost_kib, "t_cost": new_params.t_cost, "p_cost": new_params.p_cost } }).to_string(),
+        )?;
+        tx.commit()?;
+
+        self.params = new_params;
+        self.verifier = new_verifier;
+        self.state = State::Unsealed {
+            kek: new_kek,
+            index: new_index,
+        };
+        Ok(())
     }
 
     /// Recompute the whole audit chain. Works while sealed.

@@ -30,6 +30,7 @@ export default function NewItem({ t, onClose, onCreated }: { t: T; onClose: () =
   const [approval, setApproval] = useState(DEFAULT_APPROVAL[type]);
   const [approvalTouched, setApprovalTouched] = useState(false);
   const [expires, setExpires] = useState("");
+  const [rotation, setRotation] = useState("");
   const [over, setOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
@@ -54,6 +55,7 @@ export default function NewItem({ t, onClose, onCreated }: { t: T; onClose: () =
         path: path.trim(), name: name.trim(), type, tags: parseList(tags), env: env.trim() || null,
         approval_required: approval,
         expires_at: expires ? Math.floor(new Date(expires).getTime() / 1000) : null,
+        rotation_days: rotation ? Number(rotation) : null,
         ...(b64 ? { value_base64: b64 } : { value }),
       });
       toast({ title: `✅ ${emoji(type)} ${item.name}`, body: `${item.path}/${item.name}` });
@@ -104,6 +106,7 @@ export default function NewItem({ t, onClose, onCreated }: { t: T; onClose: () =
             <input type="checkbox" style={{ width: "auto" }} checked={approval} onChange={(e) => { setApproval(e.target.checked); setApprovalTouched(true); }} /> 🔴 {t("require_approval")}
           </label>
           <div className="field"><label>{t("expires_at")}</label><input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} /></div>
+          <div className="field"><label>{t("rotation_days")}</label><input type="number" min={1} value={rotation} onChange={(e) => setRotation(e.target.value)} placeholder="90" /></div>
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button className="btn" onClick={onClose}>{t("cancel")}</button>

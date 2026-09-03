@@ -32,6 +32,7 @@ fn item(path: &str, name: &str, t: ItemType, tags: &[&str]) -> NewItem {
         env: Some("prod".into()),
         approval_required: None,
         expires_at: None,
+        rotation_days: None,
     }
 }
 
