@@ -157,12 +157,15 @@ it idempotently through the API with a token read from a file:
    same day). Everything else is denied at Cloudflare's edge before reaching
    the tunnel. *Done* (app `508fe70e-…`).
 
-Client side, on an allow-listed machine with `cloudflared` installed:
+Client side, on an allow-listed machine with `cloudflared` installed. The
+account for this hostname is the operator's own (`manfred`); `CatWhiskers`
+belongs to a different project on the same host and was only used for the
+setup work:
 
 ```
 Host ssh.bastet.tw
   ProxyCommand cloudflared access ssh --hostname %h
-  User CatWhiskers
+  User manfred
   IdentityFile ~/.ssh/<key>
 ```
 
@@ -191,7 +194,7 @@ cloudflared access tcp --hostname ssh.bastet.tw --url 127.0.0.1:2222
 ```
 
 then connect the client to host `127.0.0.1`, port `2222`, protocol SSH2, user
-`CatWhiskers`, public-key authentication with the same key. `cloudflared`
+`manfred`, public-key authentication with that account's key. `cloudflared`
 must be running while the session is open; on Windows a logon-triggered
 scheduled task (`schtasks /Create /SC ONLOGON /TN "cloudflared ssh.bastet.tw"
 /TR "\"C:\Program Files (x86)\cloudflared\cloudflared.exe\" access tcp
