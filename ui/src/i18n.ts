@@ -37,6 +37,9 @@ const zh = {
   type_oauth: "OAuth", type_ssh_key: "SSH 金鑰", type_certificate: "憑證", type_file: "檔案",
   env_prod: "prod", env_staging: "staging", env_dev: "dev", env_personal: "personal",
   tree_all: "全部", keyboard_hint: "快捷鍵: / 搜尋 · Esc 關閉 · 收件匣 a/d",
+  use_tab: "使用綁定", use_hint: "讓 Agent 「用」這把憑證而不「看」它:保險庫代為對下列 URL 發出請求並注入 header。留空 = 不允許 use_secret。",
+  use_urls: "允許的 URL 樣式 (每行一個,https:// 開頭,結尾 * 表示前綴)", use_header: "注入的 header 模板 ({value} 會被替換)", use_methods: "允許的方法",
+  use_save: "儲存綁定", use_clear: "清除綁定", use_saved: "使用綁定已更新", use_badge: "可代發",
 };
 
 const en: typeof zh = {
@@ -76,6 +79,9 @@ const en: typeof zh = {
   type_oauth: "OAuth", type_ssh_key: "SSH key", type_certificate: "Certificate", type_file: "File",
   env_prod: "prod", env_staging: "staging", env_dev: "dev", env_personal: "personal",
   tree_all: "All", keyboard_hint: "Keys: / search · Esc close · inbox a/d",
+  use_tab: "Use binding", use_hint: "Let an agent USE this credential without SEEING it: the vault sends requests to the URLs below with the header injected. Empty = use_secret not allowed.",
+  use_urls: "Allowed URL patterns (one per line, https://, trailing * = prefix)", use_header: "Injected header template ({value} is replaced)", use_methods: "Allowed methods",
+  use_save: "Save binding", use_clear: "Clear binding", use_saved: "Use binding updated", use_badge: "Usable",
 };
 
 export type Key = keyof typeof zh;

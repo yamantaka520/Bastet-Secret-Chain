@@ -26,6 +26,7 @@ mod human;
 pub mod notify;
 pub mod state;
 mod ui;
+mod use_secret;
 mod util;
 
 use std::{net::SocketAddr, sync::Arc};
@@ -44,6 +45,7 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route("/v1/secrets", get(agent::list))
         .route("/v1/secrets/:sref", get(agent::release_current))
         .route("/v1/secrets/:sref/versions/:n", get(agent::release_version))
+        .route("/v1/secrets/:sref/use", post(use_secret::use_secret))
         .route("/v1/access-requests", post(agent::request_access))
         .route("/v1/access-requests/:apr", get(agent::check_access))
         .route("/v1/token/renew", post(agent::renew))
@@ -58,6 +60,10 @@ pub fn app(state: Arc<AppState>) -> Router {
             get(human::item_detail).patch(human::patch_item),
         )
         .route("/v1/items/:sref/versions", post(human::add_version))
+        .route(
+            "/v1/items/:sref/use",
+            axum::routing::put(use_secret::set_use),
+        )
         .route("/v1/items/:sref/reveal", post(human::reveal))
         .route(
             "/v1/tokens",

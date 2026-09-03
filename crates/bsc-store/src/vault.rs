@@ -664,6 +664,7 @@ impl Vault {
             expires_at: row.get(5)?,
             approval_required: row.get::<_, i64>(6)? != 0,
             local_approval_only: row.get::<_, i64>(9)? != 0,
+            has_use_binding: row.get::<_, i64>(10)? != 0,
             current_version: row.get(7)?,
             size: row.get::<_, i64>(8)? as u64,
         })
@@ -671,7 +672,7 @@ impl Vault {
 
     const META_SELECT: &'static str =
         "SELECT i.id, i.item_type, i.env, i.created, i.updated, i.expires_at,
-                i.approval_required, i.current_version, v.size, i.local_approval_only
+                i.approval_required, i.current_version, v.size, i.local_approval_only, (i.use_ct IS NOT NULL)
          FROM item i JOIN version v ON v.item_id = i.id AND v.n = i.current_version";
 
     /// Clear metadata for every item. Works while sealed.
@@ -700,11 +701,12 @@ impl Vault {
     pub fn detail(&self, id: &str) -> Result<ItemDetail> {
         let (kek, _) = self.keys()?;
         let meta = self.meta(id)?;
-        let (path_ct, name_ct, tags_ct): (Vec<u8>, Vec<u8>, Vec<u8>) = self.conn.query_row(
-            "SELECT path_ct, name_ct, tags_ct FROM item WHERE id = ?1",
-            [id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-        )?;
+        let (path_ct, name_ct, tags_ct, use_ct): (Vec<u8>, Vec<u8>, Vec<u8>, Option<Vec<u8>>) =
+            self.conn.query_row(
+                "SELECT path_ct, name_ct, tags_ct, use_ct FROM item WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+            )?;
         let open = |f: &'static str, ct: &[u8]| -> Result<String> {
             let pt = envelope::open_field(
                 kek,
@@ -721,11 +723,19 @@ impl Vault {
         let name = open("name", &name_ct)?;
         let tags: Vec<String> = serde_json::from_str(&open("tags", &tags_ct)?)
             .map_err(|_| StoreError::Format("tags not a JSON array".into()))?;
+        let use_binding = match use_ct {
+            Some(ct) => Some(
+                serde_json::from_str(&open("use", &ct)?)
+                    .map_err(|_| StoreError::Format("use binding not JSON".into()))?,
+            ),
+            None => None,
+        };
         Ok(ItemDetail {
             meta,
             path,
             name,
             tags,
+            use_binding,
         })
     }
 
@@ -768,6 +778,84 @@ impl Vault {
             serde_json::json!({ "tokens": tokens.len(), "hits": ids.len() }),
         )?;
         Ok(ids)
+    }
+
+    /// Set or clear the `use_secret` binding for an item (human only).
+    pub fn set_item_use(
+        &mut self,
+        id: &str,
+        binding: Option<&crate::model::UseBinding>,
+        allow_http: bool,
+        actor: &Actor,
+    ) -> Result<ItemDetail> {
+        let (kek, _) = self.keys()?;
+        self.meta(id)?;
+        let ct = match binding {
+            Some(b) => {
+                if b.header.trim().is_empty() || !b.header.contains("{value}") {
+                    return Err(StoreError::Invalid(
+                        "use binding header must contain {value}",
+                    ));
+                }
+                if b.urls.is_empty() {
+                    return Err(StoreError::Invalid(
+                        "use binding needs at least one url pattern",
+                    ));
+                }
+                if b.urls.iter().any(|u| {
+                    !(u.starts_with("https://") || (allow_http && u.starts_with("http://")))
+                }) {
+                    return Err(StoreError::Invalid("use binding urls must be https://"));
+                }
+                if b.urls.iter().any(|u| {
+                    u.trim_end_matches('*')
+                        .trim_end_matches('/')
+                        .matches('/')
+                        .count()
+                        < 2
+                        || u.trim_end_matches('*')
+                            .trim_end_matches('/')
+                            .ends_with("://")
+                }) {
+                    return Err(StoreError::Invalid("use binding urls must name a host"));
+                }
+                let json = serde_json::to_string(b)
+                    .map_err(|_| StoreError::Invalid("binding not serializable"))?;
+                Some(
+                    envelope::seal_field(
+                        kek,
+                        &Aad {
+                            item_id: id,
+                            version: 0,
+                            field: "use",
+                        },
+                        json.as_bytes(),
+                    )?
+                    .to_vec(),
+                )
+            }
+            None => None,
+        };
+        let ts = self.now();
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute(
+            "UPDATE item SET use_ct = ?2, updated = ?3 WHERE id = ?1",
+            params![id, ct, ts],
+        )?;
+        audit::append(
+            &tx,
+            ts,
+            &actor.label(),
+            "item_updated",
+            Some(id),
+            "ok",
+            &serde_json::json!({
+                "use_binding": binding.map(|b| serde_json::json!({ "urls": b.urls.len(), "methods": b.methods }))
+            })
+            .to_string(),
+        )?;
+        tx.commit()?;
+        self.detail(id)
     }
 
     /// Update clear metadata flags. Each `Some` is applied; `None` leaves the

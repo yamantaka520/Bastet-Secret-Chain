@@ -11,8 +11,11 @@ export const TYPE_EMOJI: Record<ItemType, string> = {
   oauth: "🎫", ssh_key: "🖥️", certificate: "📜", file: "🗂️",
 };
 
+export interface UseBinding { urls: string[]; header: string; methods: string[] }
+
 export interface Item {
   sref: string; type: ItemType; env: string | null;
+  has_use_binding?: boolean; use_binding?: UseBinding | null;
   created: string; updated: string; expires_at: string | null;
   approval_required: boolean; local_approval_only: boolean;
   version: number; size: number;

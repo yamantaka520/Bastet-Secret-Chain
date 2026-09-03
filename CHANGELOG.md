@@ -149,6 +149,17 @@ release exists. Until then every change lands under `Unreleased`.
   shown in `/v1/vault/status`; a failing source refuses to start.
   `deploy/bsc-unattended.conf` is the server drop-in.
 
+- **M6 step 2 — `use_secret`**: `POST /v1/secrets/{sref}/use` and the MCP
+  tool of the same name let an agent use a credential without seeing it — the
+  daemon sends one https request with the header a human bound to the item,
+  behind the same token/scope/approval/quota policy as a read plus an SSRF
+  guard (https only, no private/loopback/metadata targets, no redirects,
+  1 MiB / 30 s caps, credential header not overridable). `PUT
+  /v1/items/{sref}/use` and a 🔗 tab in the item drawer set the binding
+  (encrypted at rest). Ledger action `secret_used` carries method, host, and
+  path only. New contract codes `use_not_configured`, `use_not_allowed`,
+  `upstream_failed`.
+
 ### Status
 
 - M5 gate met on 2026-09-04 with Codex CLI and then Claude Code; Agy and

@@ -82,6 +82,18 @@ impl McpServer {
                 }, "additionalProperties": false }
             },
             {
+                "name": "use_secret",
+                "description": "Use a credential WITHOUT seeing it: the vault sends one HTTPS request on your behalf with the credential injected into the header a human bound to this item, and returns the response status, a few headers, and the body. Prefer this over get_secret whenever the credential exists only to call a service. The request must match the item's allowed URL patterns and methods; if it does not, tell the user — do not fall back to get_secret to do it yourself, and never ask the user to paste the secret. `reason` is recorded and shown to the approving human.",
+                "inputSchema": { "type": "object", "required": ["sref", "reason", "url"], "properties": {
+                    "sref":    { "type": "string" },
+                    "reason":  { "type": "string" },
+                    "url":     { "type": "string", "description": "Full https:// URL to call" },
+                    "method":  { "type": "string", "description": "GET (default), POST, PUT, PATCH, DELETE — must be permitted by the binding" },
+                    "headers": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Extra request headers; the credential header is added by the vault and cannot be set here" },
+                    "body":    { "type": "string", "description": "Request body, text" }
+                }, "additionalProperties": false }
+            },
+            {
                 "name": "renew_access",
                 "description": "Extend this token's lifetime if it is inside its renewal window (the final quarter of its life, or up to 5 minutes after expiry). Never widens scope. Call it when a result carries a token-expiry warning, at a natural boundary in your task.",
                 "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
@@ -167,6 +179,23 @@ impl McpServer {
                     400,
                     local_error("invalid_request", "approval_id is required"),
                 )),
+            },
+            "use_secret" => match s("sref") {
+                Some(sref) => {
+                    let mut body = json!({
+                        "reason": s("reason").unwrap_or_default(),
+                        "url": s("url").unwrap_or_default(),
+                        "method": s("method").unwrap_or_else(|| "GET".into()),
+                    });
+                    if let Some(h) = args.get("headers") {
+                        body["headers"] = h.clone();
+                    }
+                    if let Some(b) = args.get("body") {
+                        body["body"] = b.clone();
+                    }
+                    self.post(&format!("/v1/secrets/{sref}/use"), body).await
+                }
+                None => Ok((400, local_error("invalid_request", "sref is required"))),
             },
             "renew_access" => self.post("/v1/token/renew", json!({})).await,
             _ => Ok((

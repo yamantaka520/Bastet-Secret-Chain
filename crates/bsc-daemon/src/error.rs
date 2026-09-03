@@ -235,6 +235,41 @@ impl ApiError {
         )
     }
 
+    /// 400 — the item has no use binding.
+    pub fn use_not_configured() -> Self {
+        Self::new(
+            "use_not_configured",
+            StatusCode::BAD_REQUEST,
+            "This item has no use_secret binding.",
+            "A human must bind the item to allowed URLs and a header template in the vault UI before it can be used on your behalf. If you only need the value, call get_secret instead.",
+            "Do not ask the user to paste the secret. Do not try to reconstruct the request with the raw value.",
+        )
+        .ui("#/items")
+    }
+
+    /// 403 — the requested URL or method is outside the item's binding.
+    pub fn use_not_allowed(detail: impl Into<String>) -> Self {
+        Self::new(
+            "use_not_allowed",
+            StatusCode::FORBIDDEN,
+            detail,
+            "Tell the user which URL and method you need; a human can widen the item's use binding in the vault UI.",
+            "Do not retry with other URLs to find one that works. Do not ask the user to paste the secret.",
+        )
+        .ui("#/items")
+    }
+
+    /// 502 — the upstream did not answer usefully.
+    pub fn upstream_failed(detail: impl Into<String>) -> Self {
+        Self::new(
+            "upstream_failed",
+            StatusCode::BAD_GATEWAY,
+            detail,
+            "Retry once. If it repeats, report the upstream error to the user.",
+            "Do not ask the user to paste the secret so you can call the service directly.",
+        )
+    }
+
     /// 403 — feature off.
     pub fn handoff_disabled() -> Self {
         Self::new(

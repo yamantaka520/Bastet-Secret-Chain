@@ -64,6 +64,53 @@ impl ItemType {
     }
 }
 
+/// Where and how a credential may be *used on the agent's behalf* without
+/// the agent ever seeing it (`use_secret`, ADR 0006 complement). Set by a
+/// human; encrypted at rest because the URL patterns reveal which services
+/// an item unlocks.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct UseBinding {
+    /// Allowed request targets, `https://host/path-prefix*` patterns. Empty
+    /// means the item cannot be used through `use_secret` at all.
+    pub urls: Vec<String>,
+    /// Header injected into the outbound request, with `{value}` replaced by
+    /// the secret, e.g. `Authorization: Bearer {value}`.
+    pub header: String,
+    /// Methods the daemon will send. Empty means GET only.
+    #[serde(default)]
+    pub methods: Vec<String>,
+}
+
+impl UseBinding {
+    /// Whether `url` matches one of the allowed patterns. Patterns are exact
+    /// scheme+host, then path prefix; a trailing `*` allows any suffix. Only
+    /// https targets are allowed unless `allow_http` (a test-only relaxation
+    /// the daemon ties to its private-upstream setting) is on.
+    pub fn allows_url(&self, url: &str, allow_http: bool) -> bool {
+        let scheme_ok = url.starts_with("https://") || (allow_http && url.starts_with("http://"));
+        if !scheme_ok {
+            return false;
+        }
+        self.urls.iter().any(|p| {
+            let p = p.trim();
+            if let Some(prefix) = p.strip_suffix('*') {
+                url.starts_with(prefix) && prefix.contains("://") && prefix.len() > 8
+            } else {
+                url == p
+            }
+        })
+    }
+
+    /// Whether `method` is permitted.
+    pub fn allows_method(&self, method: &str) -> bool {
+        let m = method.to_ascii_uppercase();
+        if self.methods.is_empty() {
+            return m == "GET";
+        }
+        self.methods.iter().any(|x| x.eq_ignore_ascii_case(&m))
+    }
+}
+
 /// Input for creating an item.
 #[derive(Clone, Debug)]
 pub struct NewItem {
@@ -103,6 +150,9 @@ pub struct ItemMeta {
     /// Whether approval may only be given from the local UI, never from an
     /// external channel (ADR 0005 §4).
     pub local_approval_only: bool,
+    /// Whether a `use_secret` binding exists (the binding itself is encrypted
+    /// and only available through `ItemDetail`).
+    pub has_use_binding: bool,
     /// Highest version number.
     pub current_version: u32,
     /// Plaintext size of the current version in bytes.
@@ -120,4 +170,6 @@ pub struct ItemDetail {
     pub name: String,
     /// Decrypted tags.
     pub tags: Vec<String>,
+    /// Decrypted use binding, if any.
+    pub use_binding: Option<UseBinding>,
 }

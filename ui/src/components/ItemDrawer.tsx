@@ -10,7 +10,10 @@ type T = (k: Key, v?: Record<string, string | number>) => string;
 
 export default function ItemDrawer({ t, sref, onClose, onChanged }: { t: T; sref: string; onClose: () => void; onChanged: () => void }) {
   const [item, setItem] = useState<Item | null>(null);
-  const [tab, setTab] = useState<"detail" | "audit" | "versions">("detail");
+  const [tab, setTab] = useState<"detail" | "audit" | "versions" | "use">("detail");
+  const [useUrls, setUseUrls] = useState("");
+  const [useHeader, setUseHeader] = useState("Authorization: Bearer {value}");
+  const [useMethods, setUseMethods] = useState<string[]>(["GET"]);
   const [audit, setAudit] = useState<AuditRecord[]>([]);
   const [reveal, setReveal] = useState<{ value: string; hideAt: number } | null>(null);
   const [needPw, setNeedPw] = useState(false);
@@ -21,7 +24,12 @@ export default function ItemDrawer({ t, sref, onClose, onChanged }: { t: T; sref
   const [, tick] = useState(0);
   const toast = useToast();
 
-  useEffect(() => { api.item(sref).then(setItem).catch(() => onClose()); }, [sref]);
+  useEffect(() => {
+    api.item(sref).then((it) => {
+      setItem(it);
+      if (it.use_binding) { setUseUrls(it.use_binding.urls.join("\n")); setUseHeader(it.use_binding.header); setUseMethods(it.use_binding.methods.length ? it.use_binding.methods : ["GET"]); }
+    }).catch(() => onClose());
+  }, [sref]);
   useEffect(() => { if (tab === "audit") api.audit(1, 200, sref).then((r) => setAudit(r.records.reverse())).catch(() => {}); }, [tab, sref]);
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); }; window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
   useEffect(() => {
@@ -61,8 +69,8 @@ export default function ItemDrawer({ t, sref, onClose, onChanged }: { t: T; sref
         <h2>{emoji(item.type)} {item.name ?? item.sref} <Badges i={item} t={t} /></h2>
         <div className="mono small muted" style={{ wordBreak: "break-all" }}>{item.path} · {item.sref}</div>
         <div className="tabs">
-          {(["detail", "versions", "audit"] as const).map((k) => (
-            <button key={k} className={tab === k ? "active" : ""} onClick={() => setTab(k)}>{t(k === "detail" ? "detail" : k === "audit" ? "audit_tab" : "versions")}</button>
+          {(["detail", "versions", "use", "audit"] as const).map((k) => (
+            <button key={k} className={tab === k ? "active" : ""} onClick={() => setTab(k)}>{t(k === "detail" ? "detail" : k === "audit" ? "audit_tab" : k === "use" ? "use_tab" : "versions")}</button>
           ))}
         </div>
 
@@ -123,6 +131,36 @@ export default function ItemDrawer({ t, sref, onClose, onChanged }: { t: T; sref
             </div>
             <div className="field"><label>{t("note")}</label><input value={note} onChange={(e) => setNote(e.target.value)} /></div>
             <button className="btn primary" onClick={addVersion} disabled={!newVal && !newB64}>➕ {t("add_version")}</button>
+          </>
+        )}
+
+        {tab === "use" && (
+          <>
+            <p className="small muted">🔗 {t("use_hint")}</p>
+            <div className="field"><label>{t("use_urls")}</label>
+              <textarea value={useUrls} onChange={(e) => setUseUrls(e.target.value)} placeholder={"https://api.stripe.com/v1/*\nhttps://api.example.com/deploy"} style={{ minHeight: 90 }} />
+            </div>
+            <div className="field"><label>{t("use_header")}</label>
+              <input value={useHeader} onChange={(e) => setUseHeader(e.target.value)} className="mono" />
+            </div>
+            <div className="field"><label>{t("use_methods")}</label>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => (
+                  <label key={m} style={{ display: "flex", gap: 4, alignItems: "center", color: "inherit" }}>
+                    <input type="checkbox" style={{ width: "auto" }} checked={useMethods.includes(m)} onChange={(e) => setUseMethods((cur) => e.target.checked ? [...cur, m] : cur.filter((x) => x !== m))} /> <span className="mono">{m}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn primary" disabled={!useUrls.trim() || !useHeader.includes("{value}")} onClick={async () => {
+                try {
+                  await api.setUse(sref, { urls: useUrls.split("\n").map((x) => x.trim()).filter(Boolean), header: useHeader.trim(), methods: useMethods });
+                  setItem(await api.item(sref)); onChanged(); toast({ title: `🔗 ${t("use_saved")}` });
+                } catch (e) { toast({ title: t("error_generic"), body: String(e), bad: true }); }
+              }}>🔗 {t("use_save")}</button>
+              {item.has_use_binding && <button className="btn danger" onClick={async () => { await api.setUse(sref, null); setUseUrls(""); setItem(await api.item(sref)); onChanged(); }}>{t("use_clear")}</button>}
+            </div>
           </>
         )}
 

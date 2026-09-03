@@ -257,7 +257,8 @@ recorded in this repository and mirrored to BastetMind.
 | M3 | complete, 2026-09-03 — 82 tests, three-platform CI run `33769473982`; e2e gate met by an API-level substitute plus a recorded manual browser pass | [`M3_VALIDATION.md`](M3_VALIDATION.md) |
 | M4 | delivered 2026-09-04 — 95 tests, CI run `33777806776` with three release artifacts; LaunchAgent install / kill-restart / uninstall observed on a real Mac; **reboot itself not performed on any platform** | [`M4_VALIDATION.md`](M4_VALIDATION.md) |
 | M5 | complete, 2026-09-04 — real Codex CLI and Claude Code runs through `bsc mcp` each crossed a token renewal and a human approval; recipes for Claude Code / Codex / Agy / scripts | [`M5_VALIDATION.md`](M5_VALIDATION.md), [`AGENT_INTEGRATION.md`](AGENT_INTEGRATION.md) |
-| M6–M7 | not started | — |
+| M6 | in progress — step 1 unattended unseal (2026-09-04), step 2 `use_secret` (2026-09-04); rotation, pre-authorization, external channel, anchoring, export pending | — |
+| M7 | not started | — |
 
 ## 7. Open questions
 
@@ -269,13 +270,14 @@ Tracked so they are not silently decided by implementation:
    versus raw file copy. Needs a decision before M4 packaging.
 3. **TOTP** generation inside the vault: convenient, but it turns the vault
    into a second factor holder alongside the first. Deferred to M6.
-4. ~~Whether agent reads should support a use-once wrapper.~~ **Resolved
-   2026-09-03**: the direction is accepted as `use_secret` / `bsc exec`, where
-   the daemon injects the value into a child process or proxies the call so the
-   agent never observes the credential. See
-   [ADR 0006](adr/0006-mcp-as-the-primary-agent-interface.md); implementation
-   scheduled for M6. Which providers support genuinely derived short-lived
-   credentials remains to be surveyed.
+4. ~~Whether agent reads should support a use-once wrapper.~~ **Implemented
+   2026-09-04 as `use_secret`** (M6 step 2): the daemon proxies one https
+   request with the credential injected per a human-set binding (URL patterns,
+   header template, methods), behind the same policy as a read plus an SSRF
+   guard; the agent never observes the value. `bsc exec` (child-process
+   injection) was *not* built — a child process the agent controls can print
+   its environment, so it would not deliver the guarantee. Which providers
+   support genuinely derived short-lived credentials remains to be surveyed.
 5. **BastetAgentOS / Bastet Workstation integration** — BSC as their credential
    provider. Not before M5, and not a design constraint on M1–M4.
 6. The default parameters in [ADR 0005](adr/0005-approval-and-reminder-model.md)

@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS item (
     expires_at        INTEGER,
     approval_required INTEGER NOT NULL,
     local_approval_only INTEGER NOT NULL DEFAULT 0,
+    use_ct            BLOB,
     current_version   INTEGER NOT NULL,
     path_ct           BLOB NOT NULL,
     name_ct           BLOB NOT NULL,

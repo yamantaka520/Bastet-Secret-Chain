@@ -50,7 +50,11 @@ fn reason_from(
 
 /// Item detail if the token's scope covers it; `scope_mismatch` otherwise.
 /// The vault must be unsealed (scope is ciphertext at rest).
-fn in_scope(v: &bsc_store::Vault, t: &TokenRecord, sref: &str) -> Result<ItemDetail, ApiError> {
+pub(crate) fn in_scope(
+    v: &bsc_store::Vault,
+    t: &TokenRecord,
+    sref: &str,
+) -> Result<ItemDetail, ApiError> {
     if v.is_sealed() {
         return Err(ApiError::vault_sealed());
     }
@@ -66,7 +70,11 @@ fn in_scope(v: &bsc_store::Vault, t: &TokenRecord, sref: &str) -> Result<ItemDet
 }
 
 /// Whether this read needs a human right now.
-fn needs_approval(v: &bsc_store::Vault, t: &TokenRecord, d: &ItemDetail) -> Result<bool, ApiError> {
+pub(crate) fn needs_approval(
+    v: &bsc_store::Vault,
+    t: &TokenRecord,
+    d: &ItemDetail,
+) -> Result<bool, ApiError> {
     if !d.meta.approval_required {
         return Ok(false);
     }

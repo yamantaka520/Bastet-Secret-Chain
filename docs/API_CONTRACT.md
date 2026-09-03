@@ -67,6 +67,7 @@ RFC 3339 UTC. Every response carries `X-BSC-Request-Id`.
 | `GET` | `/v1/secrets` | List in-scope items — **metadata only**, never values |
 | `GET` | `/v1/secrets/{sref}` | Release the current version's value |
 | `GET` | `/v1/secrets/{sref}/versions/{n}` | Release a specific version |
+| `POST` | `/v1/secrets/{sref}/use` | **Use without seeing**: the daemon sends one https request with the credential injected per the item's binding; body `{ reason, url, method?, headers?, body? }`; answers `{ upstream_status, upstream_headers, body\|body_base64, truncated }` |
 | `POST` | `/v1/access-requests` | Ask for approval explicitly |
 | `GET` | `/v1/access-requests/{apr}` | Poll an approval |
 | `POST` | `/v1/token/renew` | Extend the calling token inside its renewal window |
@@ -137,6 +138,7 @@ recover without a human by calling renew.
 | `GET` `POST` | `/v1/items` | List / create |
 | `GET` `PATCH` | `/v1/items/{sref}` | Detail / metadata edit |
 | `POST` | `/v1/items/{sref}/versions` | Add a version (rotate) |
+| `PUT` | `/v1/items/{sref}/use` | Set or clear the use binding `{ binding: { urls: ["https://…/*"], header: "Authorization: Bearer {value}", methods: ["GET","POST"] } \| null }` |
 | `POST` | `/v1/items/{sref}/reveal` | Human reveal; body `{ passphrase? }` — required for approval-required items |
 | `GET` `POST` | `/v1/tokens` | List / mint (value returned exactly once) |
 | `DELETE` | `/v1/tokens/{tok}` | Revoke |
@@ -173,7 +175,7 @@ local bucket.
 
 `vault_created` `unseal` `login` `seal` `item_created` `item_updated`
 `version_added` `secret_read` `search` `token_minted` `token_renewed`
-`token_revoked` `session_opened` `session_closed` `approval_requested`
+`token_revoked` `secret_used` `session_opened` `session_closed` `approval_requested`
 `approval_escalated` `approval_decided` `approval_timeout` and, once
 implemented, `handoff_minted` `handoff_used` `exposure_acknowledged`.
 `approval_escalated` carries `step`; the notification itself is the
@@ -193,9 +195,18 @@ descriptions are security-relevant text and are reviewed as such.
 | `get_secret` | `{ sref: string, reason: string }` | `{ value, version, type, expires_at, warning? }` **or** an `approval_pending` result | `reason` required |
 | `request_access` | `{ sref: string, reason: string }` | `{ approval_id, expires_at }` | Explicit ask; use when `get_secret` returned `approval_pending` and the agent wants a handle |
 | `check_access` | `{ approval_id: string, wait_seconds?: number ≤ 60 }` | `{ status, value? }` | Server-side blocking up to `wait_seconds`; value returned once |
+| `use_secret` | `{ sref, reason, url, method?, headers?, body? }` | the daemon's `/use` response | The credential never enters the agent; URL and method must match the human-set binding; the credential header cannot be supplied or overridden by the agent |
 | `renew_access` | `{}` | `{ expires_at, renewable_until }` | Never widens scope |
 
 There is no write tool. If a future need arises it is a new ADR, not a new tool.
+
+`use_secret` is the value-free delegation promised in ADR 0006 and master
+plan open question 4, implemented 2026-09-04. Its guards, in order: token,
+liveness, scope, approval (a use pends exactly like a read), the item's
+binding (https-only URL patterns, methods), the SSRF guard (no private,
+loopback, link-local, or metadata addresses; no redirects; 30 s; 1 MiB body),
+and only then decryption. The ledger records `secret_used` with method, host,
+and path — never the value, never the response.
 
 Canonical `get_secret` description (the text the model reads):
 
@@ -248,6 +259,9 @@ Every non-2xx body:
 | `reason_required` | 400 | Repeat the call with a concrete `reason`. | Do not use a placeholder reason. |
 | `invalid_request` | 400 | Fix the request per `message`. | — |
 | `handoff_disabled` | 403 | Handoff links are off. Use a token. | Do not ask the user to paste the secret. |
+| `use_not_configured` | 400 | The item has no use binding. A human binds URLs and a header in the UI, or call `get_secret` if you truly need the value. | Do not reconstruct the request with the raw value. Do not ask the user to paste the secret. |
+| `use_not_allowed` | 403 | The URL, method, target address, or value type is outside what this item may be used for. Tell the user what you need. | Do not probe other URLs. Do not ask the user to paste the secret. |
+| `upstream_failed` | 502 | The service did not answer. Retry once, then report. | Do not ask for the secret so you can call the service yourself. |
 | `unauthorized` | 401 | No or unrecognized credential. Tell the user to check the MCP/client configuration. | Do not guess a token. Do not ask the user to paste a secret or passphrase. |
 
 Human-surface codes, same shape: `bad_passphrase` (401), `forbidden_origin`

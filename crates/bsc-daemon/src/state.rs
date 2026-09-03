@@ -51,6 +51,12 @@ pub struct Config {
     /// unattended unseal (`"systemd-credential"`, `"macos-keychain"`). `None`
     /// means the vault waits for a human. Shown in `/v1/vault/status`.
     pub unattended_unseal: Option<String>,
+    /// Permit `use_secret` upstreams that resolve to loopback, private, or
+    /// link-local addresses. Off in production (SSRF guard); tests turn it on
+    /// to talk to a mock upstream.
+    pub allow_private_upstreams: bool,
+    /// Response body cap for `use_secret`, bytes.
+    pub use_max_body: usize,
 }
 
 impl Default for Config {
@@ -70,6 +76,8 @@ impl Default for Config {
             public_origin: None,
             login_attempts_per_10m: 5,
             unattended_unseal: None,
+            allow_private_upstreams: false,
+            use_max_body: 1 << 20,
         }
     }
 }

@@ -43,6 +43,7 @@ fn meta_json(m: &ItemMeta) -> serde_json::Value {
         "expires_at": m.expires_at.map(rfc3339),
         "approval_required": m.approval_required,
         "local_approval_only": m.local_approval_only,
+        "has_use_binding": m.has_use_binding,
         "version": m.current_version,
         "size": m.size,
     })
@@ -194,6 +195,7 @@ pub async fn list_items(State(state): State<Arc<AppState>>, headers: HeaderMap) 
             j["name"] = json!(d.name);
             j["path"] = json!(d.path);
             j["tags"] = json!(d.tags);
+            j["use_binding"] = json!(d.use_binding);
         }
         out.push(j);
     }
@@ -267,6 +269,7 @@ pub async fn item_detail(
         j["name"] = json!(d.name);
         j["path"] = json!(d.path);
         j["tags"] = json!(d.tags);
+        j["use_binding"] = json!(d.use_binding);
     }
     Ok(Json(j).into_response())
 }

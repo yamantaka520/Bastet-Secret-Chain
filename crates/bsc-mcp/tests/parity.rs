@@ -135,7 +135,7 @@ async fn call(m: &McpServer, name: &str, args: Value) -> (bool, Value) {
 }
 
 #[tokio::test]
-async fn tools_list_is_exactly_the_read_only_five_with_safety_text() {
+async fn tools_list_is_exactly_the_read_only_six_with_safety_text() {
     let m = McpServer::new("http://127.0.0.1:1", "bsct_x");
     let resp = m
         .handle(json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }))
@@ -317,6 +317,26 @@ async fn mcp_and_http_return_identical_json_for_success_and_every_reachable_erro
     assert_eq!(v["value"], "guarded");
     let (_, v) = call(&m, "check_access", json!({ "approval_id": apr })).await;
     assert_eq!(v["status"], "consumed");
+
+    // use_secret without a binding: use_not_configured, identical to HTTP.
+    let (is_err, mcp) = call(
+        &m,
+        "use_secret",
+        json!({ "sref": plain, "reason": "r", "url": "https://api.example/x" }),
+    )
+    .await;
+    assert!(is_err);
+    assert_eq!(mcp["error"], "use_not_configured");
+    let http_r = reqwest::Client::new()
+        .post(format!("{}/v1/secrets/{plain}/use", fx.base))
+        .bearer_auth(&token)
+        .json(&json!({ "reason": "r", "url": "https://api.example/x", "method": "GET" }))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(http_r.status().as_u16(), 400);
+    let http: Value = strip(http_r.json().await.unwrap());
+    assert_eq!(mcp, http);
 
     // renew_access outside the window: invalid_request, same as HTTP.
     let (is_err, mcp) = call(&m, "renew_access", json!({})).await;

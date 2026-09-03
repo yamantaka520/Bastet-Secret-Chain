@@ -33,6 +33,8 @@ export const api = {
   patchItem: (sref: string, b: Record<string, unknown>) => call<Item>("PATCH", `/v1/items/${sref}`, b),
   addVersion: (sref: string, b: { value?: string; value_base64?: string; note?: string }) =>
     call<{ sref: string; version: number }>("POST", `/v1/items/${sref}/versions`, b),
+  setUse: (sref: string, binding: { urls: string[]; header: string; methods: string[] } | null) =>
+    call<{ sref: string; use_binding: unknown }>("PUT", `/v1/items/${sref}/use`, { binding }),
   reveal: (sref: string, passphrase?: string) =>
     call<{ sref: string; version: number; value: string | null; value_base64: string | null }>(
       "POST", `/v1/items/${sref}/reveal`, passphrase ? { passphrase } : {}),

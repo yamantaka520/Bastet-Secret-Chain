@@ -88,6 +88,22 @@ approve. **Residual:** the approval control now depends on a third-party
 service being reachable, and a compromised messaging account can approve
 anything not flagged local-only.
 
+### A4d — `use_secret` turns the daemon into an HTTP client
+
+Letting the daemon make outbound requests on an agent's behalf removes the
+credential from the agent, but adds a new surface: a manipulated agent could
+try to aim the daemon at internal services (SSRF) or at a look-alike host.
+Controls: only URLs matching a **human-set** per-item binding are ever sent
+to; patterns must be `https://`; the daemon resolves the host and refuses
+loopback, private, link-local, CGNAT, and cloud-metadata addresses (and
+`*.local`, `*.internal`, `localhost`); redirects are not followed; the agent
+cannot set or override the credential header, `Host`, or `Cookie`; body 1 MiB
+and 30 s caps; every use is `secret_used` with host and path. **Residual:**
+resolution happens twice (guard, then client) — a DNS-rebinding window exists
+and is accepted for a single-operator vault; a binding that is itself too broad
+(`https://*` is refused, but `https://big-cdn.example/*` may host attacker
+content) is the human's decision to make carefully.
+
 ### A5 — Local process snooping the daemon
 
 Loopback binding does not authenticate the peer. Controls: tokens required on
