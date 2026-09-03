@@ -83,8 +83,25 @@ release exists. Until then every change lands under `Unreleased`.
   (renewable expiry is `401`, reveal is `POST`, sessions cover local-only
   items, item id is the sref, human codes and same-origin added).
 
+- **M3 — `ui/`**: the operator's single-page app (Vite 7, React 19,
+  TypeScript, no UI library) — login/unseal, overview tiles, secrets with a
+  path tree and type/env/text filters, item drawer with detail, versions, and
+  per-item audit, new-item modal with an emoji type grid and file drop,
+  tokens with a shown-once mint sheet and MCP config snippet, approval inbox
+  with verbatim reason, countdown, and `a`/`d` keys, task-session control in
+  the header, expiry panel, audit-chain browser; zh-Hant and English; light
+  and dark; browser notifications opt-in.
+- **M3 — daemon**: serves the embedded UI from `/` with CSP and hardening
+  headers, `build.rs` placeholder when the UI is not built,
+  `GET /v1/audit?subject=`, `OsNotifier` (osascript / notify-send /
+  PowerShell) as the default for `bsc serve`, `bsc init --passphrase-stdin`.
+- `docs/M3_VALIDATION.md`, including the recorded manual browser pass and
+  the stated e2e substitution.
+
 ### Status
 
+- M3 delivered locally on 2026-09-03 with 82 passing tests; CI evidence
+  pending. M4 (packaging and auto-start) not started. No release.
 - M2 gate met on 2026-09-03: 79 passing tests locally and on Ubuntu, macOS,
   and Windows (CI run `33766212364`). M3 (Web UI) not started. No release.
 - M1 gate met on 2026-09-03: 43 passing tests locally and on Ubuntu, macOS,

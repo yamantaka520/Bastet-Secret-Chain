@@ -91,6 +91,16 @@ impl AppState {
         Self::with(vault, config, system_clock(), Arc::new(LogNotifier))
     }
 
+    /// Production state with a chosen notifier (desktop notifications for
+    /// `bsc serve`).
+    pub fn new_with_notifier(
+        vault: Vault,
+        config: Config,
+        notifier: Arc<dyn Notifier>,
+    ) -> Arc<AppState> {
+        Self::with(vault, config, system_clock(), notifier)
+    }
+
     /// Fully injected state. Sets the vault's clock to the same source so
     /// ledger timestamps and expiry decisions agree.
     pub fn with(
@@ -204,6 +214,8 @@ impl AppState {
             Ok(steps) => {
                 for (id, step) in steps {
                     if let Ok(a) = v.approval(&id) {
+                        let item_name = v.detail(&a.item_id).ok().map(|d| d.name);
+                        let token_label = v.token(&a.token_id).ok().and_then(|t| t.label);
                         self.notifier.notify(&Escalation {
                             approval_id: a.id,
                             step,
@@ -211,6 +223,8 @@ impl AppState {
                             token_id: a.token_id,
                             reason: a.reason,
                             expires_at: a.expires_at,
+                            item_name,
+                            token_label,
                         });
                     }
                 }

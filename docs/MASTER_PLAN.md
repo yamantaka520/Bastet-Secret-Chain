@@ -239,7 +239,8 @@ recorded in this repository and mirrored to BastetMind.
 | M0 | complete, 2026-09-03 | this repository at `2e3197b` and `0f33b25` |
 | M1 | complete, 2026-09-03 — 43 tests, three-platform CI run `33761893191` | [`M1_VALIDATION.md`](M1_VALIDATION.md) |
 | M2 | complete, 2026-09-03 — 79 tests, three-platform CI run `33766212364` | [`M2_VALIDATION.md`](M2_VALIDATION.md), [`API_CONTRACT.md`](API_CONTRACT.md) |
-| M3–M7 | not started | — |
+| M3 | delivered locally, 2026-09-03; CI evidence pending; e2e gate met by an API-level substitute plus a manual browser pass | [`M3_VALIDATION.md`](M3_VALIDATION.md) |
+| M4–M7 | not started | — |
 
 ## 7. Open questions
 
@@ -267,7 +268,11 @@ Tracked so they are not silently decided by implementation:
 7. Which external approval channel to bind first. Telegram is the pragmatic
    choice because the operator already runs that infrastructure, but it makes
    an approval control depend on a third-party service being reachable.
-8. What the daemon should do when the operator is provably away — currently
+8. Whether to add a browser-driven e2e suite (Playwright) for the UI, and if
+   so whether to run it on one CI platform only. M3's gate was met by an
+   API-level round trip of every type plus a recorded manual pass; that is a
+   substitution and should not quietly become the standard.
+9. What the daemon should do when the operator is provably away — currently
    every pending request simply auto-denies after five minutes, which may be
    the wrong behavior for a long unattended batch.
 

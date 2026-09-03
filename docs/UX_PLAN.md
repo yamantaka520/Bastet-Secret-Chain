@@ -1,6 +1,6 @@
 # Web UI / UX Plan
 
-**Status:** baseline, 2026-09-03. Implementation begins at M3.
+**Status:** implemented in M3 (2026-09-03) as `ui/`; see `M3_VALIDATION.md` for what shipped and what did not (no ⌘K palette yet).
 Goal: a vault a human *enjoys* using, so that secrets actually get stored here
 instead of in a notes app — without the pleasantness costing safety.
 

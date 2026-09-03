@@ -7,12 +7,12 @@ without the secret ever living in a URL, a prompt, or a shell history.**
 Humans put credentials in through a Web UI. Agents take them out through an
 authenticated reference. Every retrieval is appended to a tamper-evident chain.
 
-> **Status: M2 delivered — daemon, tokens, approvals, MCP. No UI yet.**
-> `bsc serve` runs the `/v1` API on loopback; `bsc mcp` gives an agent five
-> read-only tools; every read is scoped, quota'd, audited, and — for
-> high-value items — held for human approval. 79 passing tests. Evidence and
-> explicit gaps: [`docs/M2_VALIDATION.md`](docs/M2_VALIDATION.md). The Web
-> UI is M3; until then the human surface is HTTP.
+> **Status: M3 delivered — the Web UI is in.** `bsc serve` hosts the
+> operator UI at `http://127.0.0.1:8787/` and the `/v1` API; `bsc mcp` gives
+> an agent five read-only tools; every read is scoped, quota'd, audited, and —
+> for high-value items — held for human approval in the inbox. 82 passing
+> tests. Evidence and explicit gaps: [`docs/M3_VALIDATION.md`](docs/M3_VALIDATION.md).
+> Packaging and boot auto-start are M4.
 
 ## What it stores
 
@@ -72,13 +72,14 @@ not follow them there.
 | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) | HTTP API and MCP tool contract, error codes, `do_not` text |
 | [`docs/M1_VALIDATION.md`](docs/M1_VALIDATION.md) | M1 test evidence and what is explicitly not done |
 | [`docs/M2_VALIDATION.md`](docs/M2_VALIDATION.md) | M2 evidence: the error-contract and MCP-parity gate tests, explicit gaps |
+| [`docs/M3_VALIDATION.md`](docs/M3_VALIDATION.md) | M3 evidence: all-types round trip, served-UI test, recorded browser pass, the e2e substitution |
 | [`docs/adr/`](docs/adr) | Architecture decision records 0001–0006 |
 | [`CHANGELOG.md`](CHANGELOG.md) | History of changes |
 
 ## Roadmap
 
 M0 baseline → M1 crypto core → M2 daemon API, tokens, audit chain, MCP server →
-M3 Web UI →
+M3 Web UI (done) →
 M4 packaging and auto-start → M5 agent integration → M6 rotation, delegation,
 external approval → M7 hardening and first release. Gates are defined in the master
 plan; nothing is claimed done until its gate is met.
@@ -87,11 +88,12 @@ plan; nothing is claimed done until its gate is met.
 
 ```sh
 bsc init                      # creates ~/.bsc/vault.bsc, prompts for a passphrase
-bsc serve                     # http://127.0.0.1:8787, starts sealed
+bsc serve                     # UI + API at http://127.0.0.1:8787, starts sealed
 bsc audit                     # verify the ledger offline
 ```
 
-Unseal and work through the human API (the UI arrives in M3):
+Open `http://127.0.0.1:8787/`, unseal, and work in the UI. The same things
+are reachable over the human API:
 
 ```sh
 curl -c jar -H 'X-BSC-Client: cli' -H 'Content-Type: application/json' \
@@ -114,6 +116,7 @@ Give an agent the MCP server, not the token in a prompt:
 ## Building
 
 ```sh
+npm --prefix ui ci && npm --prefix ui run build   # the UI, embedded on the next cargo build
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace

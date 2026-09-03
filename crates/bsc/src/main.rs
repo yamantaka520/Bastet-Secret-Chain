@@ -29,6 +29,10 @@ enum Cmd {
         /// Where to create the vault.
         #[arg(long, default_value_os_t = default_vault())]
         vault: PathBuf,
+        /// Read the passphrase from the first line of stdin instead of the
+        /// terminal. For scripts and tests; no confirmation prompt.
+        #[arg(long)]
+        passphrase_stdin: bool,
     },
     /// Run the daemon. The vault starts sealed; unseal from the UI or API.
     Serve {
@@ -98,7 +102,10 @@ fn main() -> ExitCode {
 fn run() -> Result<(), String> {
     let cli = Cli::parse();
     match cli.cmd {
-        Cmd::Init { vault } => {
+        Cmd::Init {
+            vault,
+            passphrase_stdin,
+        } => {
             if let Some(dir) = vault.parent() {
                 std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
                 #[cfg(unix)]
@@ -107,7 +114,19 @@ fn run() -> Result<(), String> {
                     let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
                 }
             }
-            let pw = prompt_passphrase(true)?;
+            let pw = if passphrase_stdin {
+                let mut line = String::new();
+                std::io::stdin()
+                    .read_line(&mut line)
+                    .map_err(|e| e.to_string())?;
+                let pw = Zeroizing::new(line.trim_end_matches(['\r', '\n']).to_string());
+                if pw.is_empty() {
+                    return Err("empty passphrase on stdin".into());
+                }
+                pw
+            } else {
+                prompt_passphrase(true)?
+            };
             let v = Vault::create(&vault, pw.as_bytes()).map_err(|e| e.to_string())?;
             let p = v.kdf_params();
             eprintln!(
@@ -121,7 +140,11 @@ fn run() -> Result<(), String> {
         }
         Cmd::Serve { vault, bind } => {
             let v = Vault::open(&vault).map_err(|e| format!("{}: {e}", vault.display()))?;
-            let state = bsc_daemon::AppState::new(v, bsc_daemon::Config::default());
+            let notifier = std::sync::Arc::new(bsc_daemon::notify::OsNotifier {
+                ui_url: format!("http://{bind}/"),
+            });
+            let state =
+                bsc_daemon::AppState::new_with_notifier(v, bsc_daemon::Config::default(), notifier);
             let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
             rt.block_on(async move {
                 let shutdown = async {

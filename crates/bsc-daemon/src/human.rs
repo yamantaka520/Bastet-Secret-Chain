@@ -567,23 +567,26 @@ pub async fn audit_read(
         .and_then(|s| s.parse().ok())
         .unwrap_or(100)
         .min(1000);
+    let subject = q.get("subject").cloned();
     let v = state.vault();
-    let recs: Vec<_> = v
-        .audit_read(from, limit)?
-        .into_iter()
-        .map(|r| {
-            json!({
-                "n": r.n,
-                "ts": rfc3339(r.ts),
-                "actor": r.actor,
-                "action": r.action,
-                "subject": r.subject,
-                "outcome": r.outcome,
-                "meta": serde_json::from_str::<serde_json::Value>(&r.meta).unwrap_or(json!(r.meta)),
-                "hash": hex::encode(r.hash),
-            })
+    let recs: Vec<_> = match &subject {
+        Some(s) => v.audit_read_subject(s, from, limit)?,
+        None => v.audit_read(from, limit)?,
+    }
+    .into_iter()
+    .map(|r| {
+        json!({
+            "n": r.n,
+            "ts": rfc3339(r.ts),
+            "actor": r.actor,
+            "action": r.action,
+            "subject": r.subject,
+            "outcome": r.outcome,
+            "meta": serde_json::from_str::<serde_json::Value>(&r.meta).unwrap_or(json!(r.meta)),
+            "hash": hex::encode(r.hash),
         })
-        .collect();
+    })
+    .collect();
     Ok(Json(json!({ "records": recs, "from": from, "limit": limit })).into_response())
 }
 

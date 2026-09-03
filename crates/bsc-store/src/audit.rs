@@ -191,11 +191,41 @@ pub fn verify(conn: &Connection) -> Result<ChainStatus> {
 
 /// Read records in `[from, from+limit)` for display.
 pub fn read(conn: &Connection, from: u64, limit: u64) -> Result<Vec<AuditRecord>> {
+    read_where(conn, "n >= ?1", params![from, limit], from, limit)
+}
+
+/// Records about one subject (an item, token, or session id), newest last.
+pub fn read_subject(
+    conn: &Connection,
+    subject: &str,
+    from: u64,
+    limit: u64,
+) -> Result<Vec<AuditRecord>> {
     let mut stmt = conn.prepare(
         "SELECT n, ts, actor, action, subject, outcome, meta, prev_hash, hash
-         FROM audit WHERE n >= ?1 ORDER BY n ASC LIMIT ?2",
+         FROM audit WHERE subject = ?1 AND n >= ?2 ORDER BY n ASC LIMIT ?3",
     )?;
-    let rows = stmt.query_map(params![from, limit], |row| {
+    let rows = stmt.query_map(params![subject, from, limit], row_to_record)?;
+    Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+}
+
+fn read_where(
+    conn: &Connection,
+    cond: &str,
+    p: impl rusqlite::Params,
+    _from: u64,
+    _limit: u64,
+) -> Result<Vec<AuditRecord>> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT n, ts, actor, action, subject, outcome, meta, prev_hash, hash
+         FROM audit WHERE {cond} ORDER BY n ASC LIMIT ?2"
+    ))?;
+    let rows = stmt.query_map(p, row_to_record)?;
+    Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+}
+
+fn row_to_record(row: &rusqlite::Row<'_>) -> rusqlite::Result<AuditRecord> {
+    {
         let prev: Vec<u8> = row.get(7)?;
         let hash: Vec<u8> = row.get(8)?;
         let mut p = [0u8; HASH_LEN];
@@ -213,6 +243,5 @@ pub fn read(conn: &Connection, from: u64, limit: u64) -> Result<Vec<AuditRecord>
             prev_hash: p,
             hash: h,
         })
-    })?;
-    Ok(rows.collect::<std::result::Result<Vec<_>, _>>()?)
+    }
 }

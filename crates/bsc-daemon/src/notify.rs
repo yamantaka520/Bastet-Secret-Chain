@@ -17,6 +17,10 @@ pub struct Escalation {
     pub reason: String,
     /// Auto-deny deadline, Unix seconds.
     pub expires_at: i64,
+    /// Decrypted item name, when the vault was unsealed at tick time.
+    pub item_name: Option<String>,
+    /// Token label, when available.
+    pub token_label: Option<String>,
 }
 
 /// A notification sink.
@@ -39,6 +43,98 @@ impl Notifier for LogNotifier {
             reason = %e.reason,
             "approval waiting for a human"
         );
+    }
+}
+
+/// Desktop notification through the platform's own tool, best effort:
+/// `osascript` on macOS, `notify-send` on Linux, PowerShell on Windows. No
+/// secret material is ever in the text — ids, labels, the agent's reason, and
+/// the deadline. Approve/deny actions in the notification itself are not
+/// available through these tools; the notification points at the inbox.
+///
+/// M3 default for `bsc serve`. Replace with a proper native integration when
+/// there is a tray process to own it (M4).
+#[derive(Default)]
+pub struct OsNotifier {
+    /// Base URL of the UI, for the notification body.
+    pub ui_url: String,
+}
+
+impl OsNotifier {
+    /// Title and body for one escalation, shared by every platform.
+    pub fn text(&self, e: &Escalation) -> (String, String) {
+        let title = match e.step {
+            1 => "🔐 Bastet Secret Chain — approval needed".to_string(),
+            2 => "🔐 Still waiting — approval needed".to_string(),
+            _ => "🔐 Approval about to time out".to_string(),
+        };
+        let item = e.item_name.clone().unwrap_or_else(|| e.item_id.clone());
+        let who = e.token_label.clone().unwrap_or_else(|| e.token_id.clone());
+        let body = format!(
+            "{who} wants {item}: \"{}\" — {}",
+            one_line(&e.reason, 120),
+            self.ui_url
+        );
+        (title, body)
+    }
+
+    fn command(&self, e: &Escalation) -> Option<std::process::Command> {
+        let (title, body) = self.text(e);
+        let mut cmd;
+        if cfg!(target_os = "macos") {
+            cmd = std::process::Command::new("osascript");
+            cmd.arg("-e").arg(format!(
+                "display notification \"{}\" with title \"{}\" sound name \"Ping\"",
+                applescript_escape(&body),
+                applescript_escape(&title)
+            ));
+        } else if cfg!(target_os = "linux") {
+            cmd = std::process::Command::new("notify-send");
+            cmd.arg("--urgency=critical")
+                .arg("--app-name=Bastet Secret Chain")
+                .arg(&title)
+                .arg(&body);
+        } else if cfg!(target_os = "windows") {
+            cmd = std::process::Command::new("powershell");
+            cmd.arg("-NoProfile").arg("-Command").arg(format!(
+                "Add-Type -AssemblyName System.Windows.Forms; $n = New-Object System.Windows.Forms.NotifyIcon; \
+$n.Icon = [System.Drawing.SystemIcons]::Shield; $n.Visible = $true; \
+$n.ShowBalloonTip(10000, '{}', '{}', [System.Windows.Forms.ToolTipIcon]::Warning); Start-Sleep -s 10; $n.Dispose()",
+                title.replace('\'', "''"),
+                body.replace('\'', "''")
+            ));
+        } else {
+            return None;
+        }
+        Some(cmd)
+    }
+}
+
+fn one_line(s: &str, max: usize) -> String {
+    let flat: String = s.split_whitespace().collect::<Vec<_>>().join(" ");
+    if flat.chars().count() > max {
+        let cut: String = flat.chars().take(max - 1).collect();
+        format!("{cut}…")
+    } else {
+        flat
+    }
+}
+
+fn applescript_escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+impl Notifier for OsNotifier {
+    fn notify(&self, e: &Escalation) {
+        LogNotifier.notify(e);
+        if let Some(mut cmd) = self.command(e) {
+            cmd.stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null());
+            if let Err(err) = cmd.spawn() {
+                tracing::debug!(error = %err, "desktop notification tool unavailable");
+            }
+        }
     }
 }
 

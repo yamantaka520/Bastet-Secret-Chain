@@ -25,6 +25,7 @@ pub mod error;
 mod human;
 pub mod notify;
 pub mod state;
+mod ui;
 mod util;
 
 use std::{net::SocketAddr, sync::Arc};
@@ -74,7 +75,8 @@ pub fn app(state: Arc<AppState>) -> Router {
         .route("/v1/audit", get(human::audit_read))
         .route("/v1/audit/verify", get(human::audit_verify))
         .route("/v1/handoff-links", post(human::handoff_disabled))
-        .fallback(error::fallback)
+        // ---- the embedded Web UI; unknown /v1 paths still answer in JSON
+        .fallback(ui::serve)
         .with_state(state)
 }
 
@@ -94,6 +96,7 @@ pub async fn serve(
     }
     let listener = tokio::net::TcpListener::bind(bind).await?;
     tracing::info!(%bind, "bsc daemon listening");
+    eprintln!("Bastet Secret Chain UI: http://{bind}/");
     state.spawn_ticker();
     axum::serve(listener, app(state))
         .with_graceful_shutdown(shutdown)

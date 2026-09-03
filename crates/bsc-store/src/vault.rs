@@ -799,4 +799,14 @@ impl Vault {
     pub fn audit_read(&self, from: u64, limit: u64) -> Result<Vec<AuditRecord>> {
         audit::read(&self.conn, from, limit)
     }
+
+    /// Ledger records about one subject id. Works while sealed.
+    pub fn audit_read_subject(
+        &self,
+        subject: &str,
+        from: u64,
+        limit: u64,
+    ) -> Result<Vec<AuditRecord>> {
+        audit::read_subject(&self.conn, subject, from, limit)
+    }
 }

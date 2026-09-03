@@ -31,6 +31,14 @@ Every pull request must be able to answer these, from
 4. Cryptographic primitives come from established audited crates. Do not
    hand-roll them.
 
+## Web UI
+
+`ui/` is a Vite + React + TypeScript app with no UI library. `npm --prefix ui
+run typecheck` and `npm --prefix ui run build` must pass; the daemon embeds
+`ui/dist` on the next `cargo build`. Strings live in `ui/src/i18n.ts` in both
+locales — no hard-coded text in components. Nothing sensitive goes in
+`localStorage`; only theme and locale do.
+
 ## Commits
 
 Present-tense subject lines describing the change, with the reasoning in the

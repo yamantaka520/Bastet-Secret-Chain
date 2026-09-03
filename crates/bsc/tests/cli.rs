@@ -57,6 +57,68 @@ fn audit_verifies_an_intact_vault_and_reports_a_broken_one() {
 }
 
 #[test]
+fn init_from_stdin_creates_a_vault_that_audit_verifies_and_refuses_overwrite() {
+    use std::io::Write;
+    let dir = tempfile::TempDir::new().unwrap();
+    let path = dir.path().join("nested").join("v.bsc");
+    let mut child = bsc()
+        .args(["init", "--passphrase-stdin", "--vault"])
+        .arg(&path)
+        .stdin(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(b"a passphrase for the test\n")
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Argon2id 64 MiB"));
+    assert!(path.exists());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert_eq!(
+            std::fs::metadata(path.parent().unwrap())
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+    }
+    let out = bsc()
+        .args(["audit", "--vault"])
+        .arg(&path)
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    // A second init must not clobber the vault.
+    let mut child = bsc()
+        .args(["init", "--passphrase-stdin", "--vault"])
+        .arg(&path)
+        .stdin(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    child.stdin.take().unwrap().write_all(b"x\n").unwrap();
+    let out = child.wait_with_output().unwrap();
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("already exists"));
+}
+
+#[test]
 fn audit_on_a_missing_vault_fails_cleanly() {
     let out = bsc()
         .args(["audit", "--vault", "/nonexistent/none.bsc"])
