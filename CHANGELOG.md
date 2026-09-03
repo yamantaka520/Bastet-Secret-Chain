@@ -6,6 +6,14 @@ release exists. Until then every change lands under `Unreleased`.
 
 ## [Unreleased]
 
+- **Fixed: schema migration.** Vault files written by an earlier binary
+  (schema 1, M1–M5) now migrate to schema 2 on open: `item.use_ct` and
+  `item.rotation_days` are added, `approval` loses its item foreign key,
+  `access_grant` gains `ON DELETE CASCADE`; one transaction, ledgered as
+  `schema_migrated`, never re-run, and a file from a newer binary is refused.
+  The 2026-09-04 production upgrade shipped without this and every list
+  query failed on the existing vault (UI stuck on "…"); no data was affected.
+
 ### Added
 
 - Repository baseline: Apache-2.0 license, notices, security policy,

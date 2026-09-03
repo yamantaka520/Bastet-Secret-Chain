@@ -212,10 +212,11 @@ impl Vault {
             )));
         }
         let schema_version = require_meta(&conn, "schema_version")?;
-        if schema_version != schema::SCHEMA_VERSION.to_string() {
-            return Err(StoreError::Format(format!(
-                "schema version {schema_version}"
-            )));
+        let schema_version: i64 = schema_version
+            .parse()
+            .map_err(|_| StoreError::Format(format!("schema version {schema_version:?}")))?;
+        if schema_version != schema::SCHEMA_VERSION {
+            schema::migrate(&conn, schema_version, system_now())?;
         }
 
         let salt_hex = require_meta(&conn, "kdf_salt")?;

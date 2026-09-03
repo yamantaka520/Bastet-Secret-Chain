@@ -99,3 +99,16 @@ What the tests establish, per step:
 - The `use_secret` SSRF guard resolves the host twice (guard, then client): a
   DNS-rebinding window remains and is recorded in the threat model.
 - Approval fatigue defaults (ADR 0005 §6) are still chosen, not measured.
+
+## Incident during activation — no schema migration
+
+The `91a8875` binary opened the production vault (schema 1, created by the
+M5-era binary) without complaint and then failed every item-list query with
+`no such column: i.use_ct`; the UI showed only "…". Root cause: `schema.rs`
+declared version 1 unchanged through M6 while adding columns to `CREATE TABLE
+IF NOT EXISTS`, which does nothing to an existing table. Fix: schema version 2
+with `schema::migrate` run by `Vault::open` (columns added, `approval` and
+`access_grant` rebuilt, `pragma_foreign_key_check` must be empty, ledger
+`schema_migrated`, one transaction), tested against a file rewritten into the
+exact schema-1 shape (`crates/bsc-store/tests/migrate.rs`). The M6 tests all
+passed because every test creates a fresh vault — a gap the new test closes.
