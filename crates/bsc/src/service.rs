@@ -404,6 +404,17 @@ pub fn status(spec: &Spec) -> Result<String, String> {
     })
 }
 
+/// Whether a *system-level* definition (written by hand for a server, not by
+/// `bsc service install`) is present: a systemd system unit or a LaunchDaemon.
+pub fn system_unit_present(os: Os) -> Option<PathBuf> {
+    let candidates: &[&str] = match os {
+        Os::Linux => &["/etc/systemd/system/bsc.service"],
+        Os::Macos => &["/Library/LaunchDaemons/io.bastet.bsc.plist"],
+        Os::Windows => &[],
+    };
+    candidates.iter().map(PathBuf::from).find(|p| p.exists())
+}
+
 /// Whether a definition is present (file on disk, or a scheduled task).
 pub fn is_installed(spec: &Spec) -> bool {
     match spec.definition_path() {
