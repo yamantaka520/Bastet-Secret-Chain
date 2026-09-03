@@ -282,6 +282,11 @@ pub fn run(vault: &Path, url: &str, spec: Option<&Spec>) -> Report {
                         c.push(warn("linger", "user services stop at logout; run `loginctl enable-linger` to keep the daemon up"));
                     }
                 }
+            } else if let Some(p) = service::system_unit_present(s.os) {
+                c.push(ok(
+                    "auto-start",
+                    format!("system unit {} present (server install)", p.display()),
+                ));
             } else {
                 c.push(warn(
                     "auto-start",
