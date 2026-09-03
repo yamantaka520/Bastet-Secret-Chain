@@ -122,6 +122,10 @@ release exists. Until then every change lands under `Unreleased`.
   definition. Without the flag `X-Forwarded-For` is ignored and the throttle is
   one local bucket. `deploy/` holds the nginx site, proxy snippet, and a
   hardened system unit; `docs/DEPLOY_REVERSE_PROXY.md` explains the trade-offs.
+- **Fixed:** the `bsc` binary had no TLS backend (`reqwest` without rustls),
+  so `bsc mcp` and `bsc doctor` could not reach an https daemon; `doctor`
+  failed every non-loopback URL instead of consulting the daemon's declared
+  `public_origin`. Both found on the first remote check of a deployment.
 - `deploy/cloudflare-ssh-tunnel.sh`: idempotently publishes a host's sshd on
   an existing remotely-managed Cloudflare Tunnel (ingress + proxied CNAME +
   Access app with a Bypass-by-IP policy), token read from a file, never

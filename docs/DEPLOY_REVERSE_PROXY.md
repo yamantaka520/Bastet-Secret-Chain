@@ -1,7 +1,15 @@
 # Deploying behind a reverse proxy
 
-**Status:** first done on 2026-09-04 for `https://sec.bastet.tw` on the host
-`192.168.100.250` (Ubuntu 26.04, nginx 1.28). Cloudflare proxies the hostname
+**Status:** live since 2026-09-04 02:22 (UTC+8) at `https://sec.bastet.tw` on
+the host `192.168.100.250` (Ubuntu 26.04, nginx 1.28): `bsc.service` active
+and enabled as user `bsc`, vault created by the operator, daemon sealed until
+the operator unseals it in the UI. Verified from another machine:
+`/v1/vault/status` → `{"public_origin":"https://sec.bastet.tw","sealed":true}`,
+document served with CSP and HSTS through Cloudflare, `bsc doctor
+--url https://sec.bastet.tw` ✅ daemon / ✅ bind (acknowledged public origin) /
+✅ web ui, and `bsc mcp --url https://sec.bastet.tw` answering in the error
+contract over TLS. Two defects were found and fixed by that check: the binary
+had no TLS backend at all, and `doctor` failed every non-loopback URL. Cloudflare proxies the hostname
 (orange cloud) and reaches nginx through the site's public IP and a router
 port-forward on 443 — **not** through the host's Cloudflare Tunnel, which
 carries only `mizuki-line.bastet.tw` and, since this work, `ssh.bastet.tw`. This pulls the master plan's remote-exposure gate (§4.4) forward from
@@ -111,8 +119,8 @@ it idempotently through the API with a token read from a file:
 1. **Tunnel ingress** — adds `ssh.bastet.tw → ssh://localhost:22` ahead of the
    catch-all, keeping the existing `mizuki-line.bastet.tw` rule. *Done.*
 2. **DNS** — a proxied CNAME `ssh.bastet.tw → <tunnel-id>.cfargotunnel.com`.
-   *Failed on the first run: the token had Zone:Read but not DNS:Edit on
-   `bastet.tw`.* Re-run after widening the token, or create it by hand.
+   *Failed on the first run (token had Zone:Read but not DNS:Edit); created on
+   the second run after the operator widened the token.*
 3. **Access** — a self-hosted app of type `ssh` for the hostname with one
    policy, **Bypass** when the client IP is `172.216.48.153/32` or
    `59.124.17.34/32`. Everything else is denied at Cloudflare's edge before
@@ -132,6 +140,15 @@ sshd on the host already has `PasswordAuthentication no` and
 already key-only service; it does not replace key auth. Port 22 remains open
 on the LAN as before — closing it is a separate decision.
 
+Verified from a **non**-allow-listed address (1.34.128.101): an HTTPS request
+to `ssh.bastet.tw` at the Cloudflare edge returns **403** from Access — the
+Bypass policy did not match, so the default deny applied and nothing reached
+the tunnel. The positive test (`ssh` through `cloudflared access ssh` from one
+of the two allow-listed addresses) is the operator's to run from those
+machines; it has not been observed here. Note for clients without IPv6
+routing: `cloudflared` may pick a v6 edge address first and fail with "no
+route to host" — the Access verdict above was obtained by forcing IPv4.
+
 ## Not done
 
 - No Cloudflare Access or allow-list (operator's choice, above).
@@ -141,5 +158,6 @@ on the LAN as before — closing it is a separate decision.
   `bsc service install --system` does not exist yet.
 - `bsc doctor` cannot check file permissions on a remote vault.
 - The origin's direct reachability on the public IP (above) is not mitigated.
-- The `ssh.bastet.tw` CNAME was not created by the script (token scope); the
-  negative test from a non-allow-listed IP could not run until DNS exists.
+- The positive SSH test from an allow-listed machine has not been observed.
+- The Cloudflare API token used for the setup should now be revoked or
+  narrowed by the operator; it was read from a file and never printed.
