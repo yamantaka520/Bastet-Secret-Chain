@@ -109,7 +109,9 @@ are honoured, optionally only from the listed user ids; items flagged
 🏠 local-approval-only are announced without buttons and a forged press is
 refused. The decision is ledgered as `external:telegram:<user id>`, the
 delivery as `approval_notified`. The bot token is a second systemd encrypted
-credential (`LoadCredentialEncrypted=telegram-token:/etc/bsc/telegram.cred`)
+credential (`LoadCredentialEncrypted=telegram-token:/etc/bsc/telegram.cred`;
+`deploy/telegram-setup.sh` does the whole dance on the host: token typed
+locally, validated, encrypted, chat/user id discovered from one message)
 — never on a command line. Not enabled on `sec.bastet.tw` until the operator
 supplies a bot and a chat.
 
