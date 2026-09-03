@@ -76,14 +76,20 @@ What the tests establish, per step:
   `unseal_unattended` record. The host has no TPM2, so the credential is bound
   to `/var/lib/systemd/credential.secret` (root-only) — root on the host can
   unseal, which is the trade-off ADR-level accepted for this step.
-- ③ is not configured on the host (no bot token / chat id supplied).
+- ③ is **active** since 2026-09-04: `deploy/telegram-setup.sh` run by the
+  operator on the host (token typed there, validated with `getMe`, encrypted as
+  the `telegram-token` systemd credential; chat and user id discovered from one
+  message). Journal: `telegram approval channel enabled (outbound only)`. A
+  token the operator had pasted into the assistant chat earlier was treated as
+  burned and revoked via @BotFather before setup. End-to-end approval through
+  the real Bot API: see below.
 - No anchor timer runs on the host yet; `bsc audit --anchor-file` is a manual
   command. A systemd timer writing to a location outside `/var/lib/bsc` is
   the obvious next step.
 
 ## Not done — explicitly
 
-- **Production activation of ③** (above); ① and the binary upgrade are done.
+- ①, ③, and the binary upgrade are all active in production.
 - `use_secret` has run only against a mock upstream, never a real provider.
 - The Telegram channel has run only against a mock Bot API.
 - `bsc exec` was rejected on purpose: a child process the agent controls can
