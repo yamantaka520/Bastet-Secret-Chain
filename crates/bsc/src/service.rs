@@ -104,6 +104,7 @@ impl Spec {
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>2</integer>
   <key>ProcessType</key><string>Background</string>
   <key>StandardOutPath</key><string>{out}</string>
   <key>StandardErrorPath</key><string>{err}</string>
@@ -447,6 +448,7 @@ mod tests {
             "<string>127.0.0.1:8787</string>",
             "<key>RunAtLoad</key><true/>",
             "<key>KeepAlive</key><true/>",
+            "<key>ThrottleInterval</key><integer>2</integer>",
             "/home/ann/Library/Logs/bsc/bsc.log",
         ] {
             assert!(p.contains(must), "missing {must}\n{p}");

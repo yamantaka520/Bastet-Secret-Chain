@@ -4,8 +4,9 @@
 **Gate text:** macOS/Windows/Linux artifacts, `service install`, `doctor`;
 three-platform CI plus one real-machine reboot survival test per platform.
 **Status:** partially met, 2026-09-04 — artifacts, `service install`, and
-`doctor` are delivered and CI-verified on three platforms; the **reboot
-survival test is not done on any platform** (see the last section). Nothing
+`doctor` are delivered and CI-verified on three platforms; the LaunchAgent was
+installed, killed, watched come back, and removed on a real Mac; the **reboot
+itself was not performed on any platform** (see the last section). Nothing
 here is a release.
 
 ## What was built
@@ -65,16 +66,44 @@ without a vault; `doctor` fails on a missing vault, warns (exit 0) on a stopped
 daemon, fails on a broken ledger and on a non-loopback URL, sees a running
 daemon and its UI, and never blocks on stdin.
 
+## Live test on a real Mac — 2026-09-04, with the operator's go-ahead
+
+Performed with the debug binary and the disposable demo vault, then removed:
+
+```
+bsc service install --vault …/demo.bsc --bind 127.0.0.1:8797
+  write ~/Library/LaunchAgents/io.bastet.bsc.plist
+  launchctl bootout   (tolerated: nothing loaded)  → bootstrap → kickstart -k
+launchctl print gui/501/io.bastet.bsc      state = running · program = …/bsc · pid = 13612
+GET /v1/vault/status                       {"sealed":true,…}
+bsc doctor                                 ✅ daemon running · ✅ web ui with CSP · ✅ auto-start LaunchAgent present
+kill -9 <pid 14870>                        launchd: state = spawn scheduled
+  (6 s later) pgrep                        pid 14893 — KeepAlive restarted it; /v1/vault/status answers
+bsc service uninstall                      bootout → plist removed → daemon down; vault untouched
+~/Library/Logs/bsc/bsc.err.log             two "listening" lines, one per start
+```
+
+Two things learned and changed: the first attempt checked for the restart
+after 3 s and saw `spawn scheduled`, because launchd's default
+`ThrottleInterval` is 10 s — the plist now sets it to 2 s (unit-tested). And
+the test harness's PID extraction used `\s` in `awk`, which macOS awk does not
+support; `pgrep -f` is what the recorded run used.
+
+This establishes: the definition loads, launchd supervises the process,
+`KeepAlive` recovers from a hard kill within the throttle window, `doctor`
+observes all of it, and uninstall leaves nothing but the log directory.
+
 ## The reboot test — not done, and why
 
 The gate asks for one real-machine reboot survival test per platform. None
 was performed:
 
-- **macOS:** the only real machine in this session is the operator's own. A
-  LaunchAgent is a persistent change to their login session, so it is not
-  installed without an explicit go-ahead, and a reboot is theirs to do. The
-  definition passes `plutil -lint`; `launchctl bootstrap` / `kickstart` were
-  not run.
+- **macOS:** with the operator's go-ahead the LaunchAgent was installed,
+  observed under launchd, hard-killed and watched restart, and then removed
+  (above). `RunAtLoad` is set, so it will start at login — but a login after
+  a reboot is a different event from a `kickstart`, and it has not been
+  observed. The operator can do it in one sitting: `bsc service install`,
+  reboot, `bsc doctor`.
 - **Linux, Windows:** no real machine available. CI runners cannot reboot.
   The unit passes `systemd-analyze verify`; the Task Scheduler line is
   unit-tested but never executed.
@@ -84,7 +113,8 @@ observation. The master plan status table says so.
 
 ## Not done — explicitly
 
-- **Reboot survival on any platform** (above).
+- **Reboot survival on any platform** (above). macOS got the closest thing
+  short of a reboot; Linux and Windows got a linted definition only.
 - **No code signing or notarization.** macOS Gatekeeper will warn on the
   downloaded binary until M7; the install script does not bypass that.
 - **No installer packages** (`.pkg`, `.msi`, `.deb`). Archives only.
