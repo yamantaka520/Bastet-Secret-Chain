@@ -239,7 +239,7 @@ recorded in this repository and mirrored to BastetMind.
 | M0 | complete, 2026-09-03 | this repository at `2e3197b` and `0f33b25` |
 | M1 | complete, 2026-09-03 — 43 tests, three-platform CI run `33761893191` | [`M1_VALIDATION.md`](M1_VALIDATION.md) |
 | M2 | complete, 2026-09-03 — 79 tests, three-platform CI run `33766212364` | [`M2_VALIDATION.md`](M2_VALIDATION.md), [`API_CONTRACT.md`](API_CONTRACT.md) |
-| M3 | delivered locally, 2026-09-03; CI evidence pending; e2e gate met by an API-level substitute plus a manual browser pass | [`M3_VALIDATION.md`](M3_VALIDATION.md) |
+| M3 | complete, 2026-09-03 — 82 tests, three-platform CI run `33769473982`; e2e gate met by an API-level substitute plus a recorded manual browser pass | [`M3_VALIDATION.md`](M3_VALIDATION.md) |
 | M4–M7 | not started | — |
 
 ## 7. Open questions

@@ -100,8 +100,9 @@ release exists. Until then every change lands under `Unreleased`.
 
 ### Status
 
-- M3 delivered locally on 2026-09-03 with 82 passing tests; CI evidence
-  pending. M4 (packaging and auto-start) not started. No release.
+- M3 gate met on 2026-09-03: 82 passing tests locally and on Ubuntu, macOS,
+  and Windows with the UI built and embedded (CI run `33769473982`). M4
+  (packaging and auto-start) not started. No release.
 - M2 gate met on 2026-09-03: 79 passing tests locally and on Ubuntu, macOS,
   and Windows (CI run `33766212364`). M3 (Web UI) not started. No release.
 - M1 gate met on 2026-09-03: 43 passing tests locally and on Ubuntu, macOS,

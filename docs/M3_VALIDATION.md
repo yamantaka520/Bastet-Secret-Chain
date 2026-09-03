@@ -4,8 +4,8 @@
 **Gate text:** Upload → encrypt → classify → copy reference, approval inbox,
 task-session control, ⏰ expiry panel, local OS notifications, per-item audit
 view; e2e test on all item types.
-**Status:** gate met with one stated substitution (below), 2026-09-03. Local
-evidence plus CI as recorded at the end. Nothing here is a release.
+**Status:** gate met with one stated substitution (below), 2026-09-03 — local
+evidence plus three-platform CI on commit `5453193`. Nothing here is a release.
 
 ## What was built
 
@@ -138,4 +138,9 @@ master plan's open questions so it is not forgotten.
 
 | Run | Commit | Ubuntu | macOS | Windows | Hygiene |
 | --- | --- | --- | --- | --- | --- |
-| _pending_ | — | — | — | — | — |
+| [`33769473982`](https://github.com/yamantaka520/Bastet-Secret-Chain/actions/runs/33769473982) | `5453193` | ✅ | ✅ | ✅ | ✅ |
+
+Each Rust job first ran `npm ci`, `npm run typecheck`, and `npm run build` for
+the UI, then `cargo fmt --check`, `cargo clippy --all-targets --locked
+-D warnings`, `cargo test --workspace --locked` (82 tests) with the real
+`ui/dist` embedded, and the known-answer regeneration check.
