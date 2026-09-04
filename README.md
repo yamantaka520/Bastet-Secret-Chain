@@ -16,15 +16,20 @@ without the secret ever living in a URL, a prompt, or a shell history.**
 Humans put credentials in through a Web UI. Agents take them out through an
 authenticated reference. Every retrieval is appended to a tamper-evident chain.
 
-> **Status: 0.1.0, the first tagged build.** M0–M6 are complete: crypto core,
+> **Status: 0.2.0.** M0–M7 are complete: crypto core,
 > daemon API, agent tokens, hash-chained ledger, MCP server, Web UI, packaging
 > and auto-start, real-agent integration, and the M6 set — unattended unseal,
 > use-without-seeing, an outbound approval channel, passphrase rotation,
-> pre-authorization, ledger anchoring and break-glass export. 127 passing
-> tests on three platforms. One deployment is running behind nginx with the
-> approval channel verified end to end against the real Telegram Bot API.
-> Not yet done: signed binaries, an external review, the hardening pass (M7).
-> Evidence and gaps: [`docs/M6_VALIDATION.md`](docs/M6_VALIDATION.md).
+> pre-authorization, ledger anchoring and break-glass export; and the M7
+> hardening pass — fuzzed parsers, a signed release, a restore drill and a
+> dependency policy. 136 passing tests on three platforms, and a Web UI in five
+> languages. One deployment is running behind nginx with the approval channel
+> verified end to end against the real Telegram Bot API.
+> **Not yet done: an external review.** The checklist for one is
+> [`docs/EXTERNAL_REVIEW.md`](docs/EXTERNAL_REVIEW.md); until someone outside
+> this project uses it, every security claim here is self-assessed. Evidence
+> and gaps per milestone: [`docs/M6_VALIDATION.md`](docs/M6_VALIDATION.md),
+> [`docs/M7_VALIDATION.md`](docs/M7_VALIDATION.md).
 
 ## What it stores
 
@@ -94,25 +99,32 @@ languages: [`docs/manual/`](docs/manual/).
 | [`docs/UX_PLAN.md`](docs/UX_PLAN.md) | Web UI information architecture and interactions |
 | [`docs/AGENT_INTEGRATION.md`](docs/AGENT_INTEGRATION.md) | Per-client MCP configuration and what to tell the agent |
 | [`docs/DEPLOY_REVERSE_PROXY.md`](docs/DEPLOY_REVERSE_PROXY.md) | Running behind nginx / Cloudflare with `--public-origin`; what it does and does not protect |
-| [`docs/M1_VALIDATION.md`](docs/M1_VALIDATION.md) … [`M6`](docs/M6_VALIDATION.md) | Per-milestone test evidence and what is explicitly **not** done |
+| [`docs/M1_VALIDATION.md`](docs/M1_VALIDATION.md) … [`M7`](docs/M7_VALIDATION.md) | Per-milestone test evidence and what is explicitly **not** done |
+| [`docs/EXTERNAL_REVIEW.md`](docs/EXTERNAL_REVIEW.md) | What a security reviewer should try to break, and the weaknesses we already know about |
 | [`docs/adr/`](docs/adr) | Architecture decision records 0001–0006 |
 | [`CHANGELOG.md`](CHANGELOG.md) | History of changes |
 
 ## Installing
 
 ```sh
-sh scripts/install.sh v0.1.0            # macOS, Linux
-.\scripts\install.ps1 -Version v0.1.0   # Windows
+sh scripts/install.sh v0.2.0            # macOS, Linux
+.\scripts\install.ps1 -Version v0.2.0   # Windows
 ```
 
 Both verify the archive against the `SHA256SUMS` published with the release.
 Read them before running them; they are not meant to be piped from the network
-into a shell. Release binaries are **not signed with a project key yet** —
-scheduled for M7 — so also verify the build provenance:
+into a shell. From v0.2.0 the checksums are signed and the build is attested,
+so you can check both:
 
 ```sh
-gh attestation verify bsc-0.1.0-<target>.tar.gz --repo yamantaka520/Bastet-Secret-Chain
+cosign verify-blob --bundle SHA256SUMS.cosign.bundle \
+  --certificate-identity-regexp "^https://github.com/yamantaka520/Bastet-Secret-Chain/.github/workflows/release.yml@refs/tags/" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
+gh attestation verify bsc-0.2.0-<target>.tar.gz --repo yamantaka520/Bastet-Secret-Chain
 ```
+
+Neither proves a maintainer approved the tag; [`SECURITY.md`](SECURITY.md) says
+what they do prove.
 
 From source, at any commit:
 
@@ -136,7 +148,7 @@ bsc export --out backup.bscx  # break-glass export under a separate passphrase
 ```
 
 `bsc service install --dry-run` prints the definition and the commands without
-touching anything. `bsc --version` reports the build (`0.1.0+f23d51a`) so you
+touching anything. `bsc --version` reports the build (`0.2.0+<sha>`) so you
 can tell which binary a machine is running.
 
 Open `http://127.0.0.1:8787/`, unseal, and work in the UI. The same things are

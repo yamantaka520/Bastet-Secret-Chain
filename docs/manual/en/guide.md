@@ -1,6 +1,6 @@
 # User guide
 
-**Applies to:** Bastet Secret Chain 0.1.0
+**Applies to:** Bastet Secret Chain 0.2.0
 **Languages:** [繁體中文](../zh-Hant/guide.md) · [简体中文](../zh-Hans/guide.md) · **English** · [日本語](../ja/guide.md) · [한국어](../ko/guide.md)
 **See also:** [Installation](install.md) · [Agent guide](agents.md)
 
@@ -63,7 +63,7 @@ Seven tabs, left to right.
 
 Item count, what expires within 30 days, pending approvals, active task
 sessions, live tokens, and the state of the audit chain. The version line shows
-the build, e.g. `0.1.0+f23d51a` — useful when a machine behaves unexpectedly
+the build, e.g. `0.2.0+f23d51a` — useful when a machine behaves unexpectedly
 after an upgrade. Also here: **Change passphrase**.
 
 ### 🗂️ Secrets

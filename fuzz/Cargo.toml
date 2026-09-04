@@ -1,0 +1,42 @@
+[package]
+name = "bsc-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+bsc-crypto = { path = "../crates/bsc-crypto" }
+bsc-store = { path = "../crates/bsc-store" }
+
+[[bin]]
+name = "sealed"
+path = "fuzz_targets/sealed.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "bundle"
+path = "fuzz_targets/bundle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "anchor_line"
+path = "fuzz_targets/anchor_line.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "export_json"
+path = "fuzz_targets/export_json.rs"
+test = false
+doc = false
+bench = false

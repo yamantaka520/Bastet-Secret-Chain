@@ -1,6 +1,6 @@
 # 설치 매뉴얼
 
-**적용 대상:** Bastet Secret Chain 0.1.0 · macOS, Windows, Linux
+**적용 대상:** Bastet Secret Chain 0.2.0 · macOS, Windows, Linux
 **언어:** [繁體中文](../zh-Hant/install.md) · [简体中文](../zh-Hans/install.md) · [English](../en/install.md) · [日本語](../ja/install.md) · **한국어**
 **함께 보기:** [사용자 가이드](guide.md) · [에이전트 가이드](agents.md)
 
@@ -47,14 +47,14 @@
 # macOS and Linux
 curl -fsSLO https://raw.githubusercontent.com/yamantaka520/Bastet-Secret-Chain/main/scripts/install.sh
 less install.sh          # read it
-sh install.sh v0.1.0
+sh install.sh v0.2.0
 ```
 
 ```powershell
 # Windows
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/yamantaka520/Bastet-Secret-Chain/main/scripts/install.ps1 -OutFile install.ps1
 notepad install.ps1      # read it
-.\install.ps1 -Version v0.1.0
+.\install.ps1 -Version v0.2.0
 ```
 
 스크립트는 사용 중인 플랫폼용 아카이브를 내려받고, 같은 릴리스에 함께 공개된
@@ -67,12 +67,24 @@ notepad install.ps1      # read it
 그것까지 확인하려면 빌드 프로비넌스 어테스테이션도 함께 검증하십시오.
 
 ```sh
-gh attestation verify bsc-0.1.0-x86_64-unknown-linux-gnu.tar.gz \
+gh attestation verify bsc-0.2.0-x86_64-unknown-linux-gnu.tar.gz \
   --repo yamantaka520/Bastet-Secret-Chain
 ```
 
-릴리스 바이너리는 아직 프로젝트 키로 서명되어 있지 않습니다. 이는 다음 마일스톤에
-예정되어 있으며 [`SECURITY.md`](../../../SECURITY.md)에 명확히 기술되어 있습니다.
+v0.2.0부터는 체크섬 파일도 Sigstore 키리스 서명으로 서명됩니다.
+
+```sh
+cosign verify-blob --bundle SHA256SUMS.cosign.bundle \
+  --certificate-identity-regexp "^https://github.com/yamantaka520/Bastet-Secret-Chain/.github/workflows/release.yml@refs/tags/" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  SHA256SUMS
+```
+
+이는 해당 파일이 이 저장소의 릴리스 워크플로에서 태그 시점에 만들어졌음을
+증명합니다. 그러나 메인테이너가 그 태그를 승인했다는 것은 증명하지 않습니다.
+이 프로젝트에는 서명 키가 없으며, 여기에 태그를 푸시할 수 있는 사람이라면
+누구나 유효한 서명을 만들 수 있습니다. [`SECURITY.md`](../../../SECURITY.md)에
+이 점이 분명히 기술되어 있습니다.
 
 **옵션 B — 소스에서 빌드.** Rust(stable)와 Node.js 22가 필요합니다.
 
@@ -87,7 +99,7 @@ cargo install --path crates/bsc --locked          # embeds it and installs bsc
 어떤 머신이 어떤 빌드를 실행 중인지 언제나 알 수 있습니다.
 
 ```sh
-bsc --version        # bsc 0.1.0+f23d51a
+bsc --version        # bsc 0.2.0+9f3c1ab
 ```
 
 ### 3.2 보관소(볼트) 생성
@@ -282,7 +294,7 @@ systemctl list-timers bsc-anchor.timer
 
 ```sh
 # 1. verify the new binary before it reaches the server
-shasum -a 256 -c bsc-0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256
+shasum -a 256 -c bsc-0.2.0-x86_64-unknown-linux-gnu.tar.gz.sha256
 
 # 2. back up the vault (a consistent copy, while the daemon runs)
 sudo python3 -c "import sqlite3;s=sqlite3.connect('file:/var/lib/bsc/vault.bsc?mode=ro',uri=True);d=sqlite3.connect('/var/lib/bsc/vault.backup.bsc');s.backup(d)"

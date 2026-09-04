@@ -13,6 +13,47 @@ release exists. Until then every change lands under `Unreleased`.
   (API contract, threat model, ADRs) stay English on purpose. README gained a
   language bar and its status block now matches the shipped software.
 
+## [0.2.0] - 2026-09-04
+
+M7, the hardening pass, plus the Web UI in five languages.
+
+### Security
+
+- **Fixed: a bundle could dictate how much memory the reader spends.**
+  `open_bundle` took the Argon2 parameters from the untrusted header with no
+  upper bound, so a `.bscx` file claiming `m_cost_kib = 0xFFFFFFFF` made
+  `bsc import` attempt a four-terabyte allocation before the authentication tag
+  could reject it. `KdfParams::validate_from_file` now bounds parameters read
+  from any file — bundle header or vault header — at 1 GiB / 16 passes /
+  16 lanes. Found while writing the fuzz targets; covered by
+  `crates/bsc-crypto/tests/hostile.rs`.
+- **Fixed: a per-call `Box::leak`** in the bundle AAD construction.
+- **Added: signed releases.** The release workflow signs `SHA256SUMS` with
+  Sigstore keyless signing and verifies the signature before drafting the
+  release. See `SECURITY.md` for how to check it, and what it does not prove.
+- **Added: fuzzing.** Four `cargo-fuzz` targets over the parsers that read
+  bytes this program did not write, run in CI on every relevant push and for
+  longer weekly.
+- **Added: a dependency policy.** `deny.toml`, enforced for licences, bans and
+  sources on every push and for RustSec advisories daily.
+
+### Added
+
+- **Web UI in five languages** — Traditional Chinese, Simplified Chinese,
+  English, Japanese, Korean — with a picker in the sidebar and on the unseal
+  screen, because before unsealing there is no sidebar. A first visit follows
+  the browser's language. Each locale is a separate file typed against the
+  reference dictionary, so a missing key is a compile error.
+- `docs/EXTERNAL_REVIEW.md`: what a reviewer should try to break, where each
+  claim lives in the code, and the weaknesses we already know about.
+- `docs/M7_VALIDATION.md` and a restore-from-backup drill
+  (`crates/bsc/tests/restore_drill.rs`) covering both recovery routes.
+
+### Changed
+
+- Internal crates now carry versions alongside their path dependencies, so the
+  workspace is publishable and unpinned-dependency checks pass.
+
 ## [0.1.0] - 2026-09-04
 
 First tagged build. Everything from M0 to M6 is in it; see
@@ -237,5 +278,6 @@ no external audit, no signed binaries yet (M7).
   and Windows (CI run `33761893191`). M2 has a contract but no code. No
   release.
 
-[Unreleased]: https://github.com/yamantaka520/Bastet-Secret-Chain/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/yamantaka520/Bastet-Secret-Chain/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/yamantaka520/Bastet-Secret-Chain/releases/tag/v0.2.0
 [0.1.0]: https://github.com/yamantaka520/Bastet-Secret-Chain/releases/tag/v0.1.0

@@ -1,10 +1,13 @@
 # Install a released bsc.exe for the current user and verify its checksum
 # against the SHA256SUMS published with the same release.
 #
-#   .\install.ps1 -Version v0.1.0
+#   .\install.ps1 -Version v0.2.0
 #
-# Integrity only (archive matches the published sums), not authenticity; signed
-# releases are scheduled for M7. Read this file before running it.
+# This checks integrity: the archive matches the sums published beside it. It
+# does not by itself check who built it, because both come from the same
+# release page. From v0.2.0 the sums are signed with Sigstore as well —
+# SECURITY.md has the `cosign verify-blob` command and says what it proves.
+# Read this file before running it.
 param([Parameter(Mandatory = $true)][string]$Version, [string]$BinDir = "$env:LOCALAPPDATA\Programs\bsc")
 $ErrorActionPreference = "Stop"
 $repo = "yamantaka520/Bastet-Secret-Chain"

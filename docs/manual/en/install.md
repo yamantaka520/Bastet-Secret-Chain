@@ -1,6 +1,6 @@
 # Installation manual
 
-**Applies to:** Bastet Secret Chain 0.1.0 · macOS, Windows, Linux
+**Applies to:** Bastet Secret Chain 0.2.0 · macOS, Windows, Linux
 **Languages:** [繁體中文](../zh-Hant/install.md) · [简体中文](../zh-Hans/install.md) · **English** · [日本語](../ja/install.md) · [한국어](../ko/install.md)
 **See also:** [User guide](guide.md) · [Agent guide](agents.md)
 
@@ -48,14 +48,14 @@ running it; it is not meant to be piped from the network into a shell.
 # macOS and Linux
 curl -fsSLO https://raw.githubusercontent.com/yamantaka520/Bastet-Secret-Chain/main/scripts/install.sh
 less install.sh          # read it
-sh install.sh v0.1.0
+sh install.sh v0.2.0
 ```
 
 ```powershell
 # Windows
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/yamantaka520/Bastet-Secret-Chain/main/scripts/install.ps1 -OutFile install.ps1
 notepad install.ps1      # read it
-.\install.ps1 -Version v0.1.0
+.\install.ps1 -Version v0.2.0
 ```
 
 The script downloads the archive for your platform, checks it against the
@@ -68,12 +68,24 @@ not prove who built it, because the sums come from the same release page. For
 that, verify the build provenance attestation as well:
 
 ```sh
-gh attestation verify bsc-0.1.0-x86_64-unknown-linux-gnu.tar.gz \
+gh attestation verify bsc-0.2.0-x86_64-unknown-linux-gnu.tar.gz \
   --repo yamantaka520/Bastet-Secret-Chain
 ```
 
-Release binaries are not yet signed with a project key. That is planned for
-the next milestone and is stated plainly in [`SECURITY.md`](../../../SECURITY.md).
+From v0.2.0 the checksum file is signed as well, with Sigstore keyless
+signing:
+
+```sh
+cosign verify-blob --bundle SHA256SUMS.cosign.bundle \
+  --certificate-identity-regexp "^https://github.com/yamantaka520/Bastet-Secret-Chain/.github/workflows/release.yml@refs/tags/" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  SHA256SUMS
+```
+
+That proves the file came out of this repository's release workflow at a tag.
+It does not prove a maintainer approved that tag — there is no project signing
+key, and anyone who can push a tag here can produce a valid signature.
+[`SECURITY.md`](../../../SECURITY.md) states this plainly.
 
 **Option B — build from source.** Requires Rust (stable) and Node.js 22.
 
@@ -88,7 +100,7 @@ Check what you got. The version carries the git commit it was built from, so
 you can always tell which build a machine is running:
 
 ```sh
-bsc --version        # bsc 0.1.0+f23d51a
+bsc --version        # bsc 0.2.0+9f3c1ab
 ```
 
 ### 3.2 Create the vault
@@ -283,7 +295,7 @@ If the ledger is ever truncated or rewritten, the unit fails and
 
 ```sh
 # 1. verify the new binary before it reaches the server
-shasum -a 256 -c bsc-0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256
+shasum -a 256 -c bsc-0.2.0-x86_64-unknown-linux-gnu.tar.gz.sha256
 
 # 2. back up the vault (a consistent copy, while the daemon runs)
 sudo python3 -c "import sqlite3;s=sqlite3.connect('file:/var/lib/bsc/vault.bsc?mode=ro',uri=True);d=sqlite3.connect('/var/lib/bsc/vault.backup.bsc');s.backup(d)"

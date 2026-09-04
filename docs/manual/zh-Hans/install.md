@@ -1,6 +1,6 @@
 # 安装手册
 
-**适用版本：**Bastet Secret Chain 0.1.0 · macOS、Windows、Linux
+**适用版本：**Bastet Secret Chain 0.2.0 · macOS、Windows、Linux
 **语言：** [繁體中文](../zh-Hant/install.md) · **简体中文** · [English](../en/install.md) · [日本語](../ja/install.md) · [한국어](../ko/install.md)
 **延伸阅读：**[使用手册](guide.md) · [Agent 接入手册](agents.md)
 
@@ -37,14 +37,14 @@
 # macOS 与 Linux
 curl -fsSLO https://raw.githubusercontent.com/yamantaka520/Bastet-Secret-Chain/main/scripts/install.sh
 less install.sh          # 先读一遍
-sh install.sh v0.1.0
+sh install.sh v0.2.0
 ```
 
 ```powershell
 # Windows
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/yamantaka520/Bastet-Secret-Chain/main/scripts/install.ps1 -OutFile install.ps1
 notepad install.ps1      # 先读一遍
-.\install.ps1 -Version v0.1.0
+.\install.ps1 -Version v0.2.0
 ```
 
 脚本会下载对应平台的压缩包，比对同一份 release 发布的 `SHA256SUMS`，然后把 `bsc` 装到 `~/.local/bin`（macOS、Linux）或 `%LOCALAPPDATA%\Programs\bsc`（Windows）。如果脚本提醒你，把该目录加进 `PATH`。
@@ -52,11 +52,20 @@ notepad install.ps1      # 先读一遍
 这个比对能证明文件在传输过程中没被损坏或替换，但**不能**证明是谁构建的——因为哈希值和文件来自同一个发布页。要验证来源，再验一次构建来源证明：
 
 ```sh
-gh attestation verify bsc-0.1.0-x86_64-unknown-linux-gnu.tar.gz \
+gh attestation verify bsc-0.2.0-x86_64-unknown-linux-gnu.tar.gz \
   --repo yamantaka520/Bastet-Secret-Chain
 ```
 
-发布的可执行文件目前**还没有**用项目密钥签名，这排在下一个里程碑，[`SECURITY.md`](../../../SECURITY.md) 有明白写出来。
+从 v0.2.0 起，校验和文件也会用 Sigstore 无密钥签名：
+
+```sh
+cosign verify-blob --bundle SHA256SUMS.cosign.bundle \
+  --certificate-identity-regexp "^https://github.com/yamantaka520/Bastet-Secret-Chain/.github/workflows/release.yml@refs/tags/" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  SHA256SUMS
+```
+
+这能证明该文件出自本仓库的 release 工作流、且来自某个 tag。它**不能**证明有维护者审核过那个 tag——这个项目没有签名密钥，任何能推送 tag 的人都做得出有效签名。[`SECURITY.md`](../../../SECURITY.md) 对此写得很明白。
 
 **方式 B——从源码构建。** 需要 Rust（stable）与 Node.js 22。
 
@@ -70,7 +79,7 @@ cargo install --path crates/bsc --locked          # 内嵌 UI 并安装 bsc
 确认装到什么版本。版本号会带上构建时的 git commit，所以你随时分得出某台机器跑的是哪一版：
 
 ```sh
-bsc --version        # bsc 0.1.0+f23d51a
+bsc --version        # bsc 0.2.0+9f3c1ab
 ```
 
 ### 3.2 创建保险库
@@ -215,7 +224,7 @@ systemctl list-timers bsc-anchor.timer
 
 ```sh
 # 1. 在新可执行文件进入服务器之前先验证
-shasum -a 256 -c bsc-0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256
+shasum -a 256 -c bsc-0.2.0-x86_64-unknown-linux-gnu.tar.gz.sha256
 
 # 2. 备份保险库（服务运行中也能取得一致的副本）
 sudo python3 -c "import sqlite3;s=sqlite3.connect('file:/var/lib/bsc/vault.bsc?mode=ro',uri=True);d=sqlite3.connect('/var/lib/bsc/vault.backup.bsc');s.backup(d)"

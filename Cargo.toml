@@ -1,15 +1,26 @@
 [workspace]
 resolver = "2"
 members = ["crates/bsc-crypto", "crates/bsc-store", "crates/bsc-daemon", "crates/bsc-mcp", "crates/bsc"]
+# The fuzz crate needs a nightly toolchain and libFuzzer; keep it out of the
+# ordinary `cargo test --workspace` build. See fuzz/README.md.
+exclude = ["fuzz"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/yamantaka520/Bastet-Secret-Chain"
 rust-version = "1.82"
 
 [workspace.dependencies]
+# The crates in this workspace, by path *and* version: the version is what
+# makes them publishable and what stops `cargo deny` counting an internal
+# dependency as an unpinned one. Bump these with `workspace.package.version`.
+bsc-crypto = { path = "crates/bsc-crypto", version = "0.2.0" }
+bsc-store = { path = "crates/bsc-store", version = "0.2.0" }
+bsc-daemon = { path = "crates/bsc-daemon", version = "0.2.0" }
+bsc-mcp = { path = "crates/bsc-mcp", version = "0.2.0" }
+
 argon2 = "0.5"
 axum = "0.7"
 base64 = "0.22"

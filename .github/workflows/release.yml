@@ -2,8 +2,9 @@ name: Release
 
 # Dormant until a tag is pushed. Builds the same artifacts CI builds on every
 # push, attaches them plus SHA256SUMS to a GitHub Release, and generates build
-# provenance attestations. Signing with a project key is M7. The release is
-# created as a draft: a human publishes it.
+# provenance attestations, and signs the checksum file with Sigstore (keyless,
+# so there is no project key to lose). The release is created as a draft: a
+# human publishes it.
 on:
   push:
     tags: ["v*"]
@@ -58,6 +59,18 @@ jobs:
         with: { path: dist, merge-multiple: true }
       - name: SHA256SUMS
         run: cd dist && sha256sum bsc-* > SHA256SUMS && cat SHA256SUMS
+      - uses: sigstore/cosign-installer@v3
+      - name: Sign the checksums
+        # Keyless: the signing certificate binds this workflow, this repository
+        # and this tag, and the record goes to the public transparency log.
+        # Signing SHA256SUMS covers every archive, because the sums do.
+        run: |
+          cd dist
+          cosign sign-blob --yes --bundle SHA256SUMS.cosign.bundle SHA256SUMS
+          cosign verify-blob --bundle SHA256SUMS.cosign.bundle \
+            --certificate-identity-regexp "^https://github.com/${GITHUB_REPOSITORY}/\.github/workflows/release\.yml@refs/tags/" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
           files: dist/*

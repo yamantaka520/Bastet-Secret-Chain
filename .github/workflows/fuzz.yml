@@ -1,0 +1,52 @@
+name: Fuzz
+
+# The parsers that read bytes this program did not write. A short run on every
+# push to main so a regression surfaces the same day; a long run weekly so the
+# corpus actually goes somewhere. See fuzz/README.md for the invariant.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "crates/bsc-crypto/**"
+      - "crates/bsc-store/**"
+      - "fuzz/**"
+      - ".github/workflows/fuzz.yml"
+  schedule:
+    - cron: "17 3 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz:
+    name: fuzz ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [sealed, bundle, anchor_line, export_json]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: fuzz
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: Run
+        env:
+          # A minute per target on push is enough to catch a regression; the
+          # weekly run is what explores.
+          SECONDS_TO_RUN: ${{ github.event_name == 'schedule' && '900' || '60' }}
+        run: |
+          cargo fuzz run ${{ matrix.target }} -- \
+            -max_total_time=$SECONDS_TO_RUN -rss_limit_mb=4096 -print_final_stats=1
+      - name: Upload crash
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts/
+          if-no-files-found: ignore

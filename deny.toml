@@ -1,0 +1,55 @@
+# cargo-deny: what this project will and will not depend on.
+#
+# A credential vault's dependency list is part of its attack surface, so the
+# rules here are stricter than a typical application's: one source, no
+# duplicate versions of anything that touches crypto, no unmaintained crates,
+# and only permissive licences.
+
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+# An advisory with no fix available is still an advisory; deal with it here in
+# the open rather than by silently ignoring it.
+ignore = []
+
+[licenses]
+version = 2
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "MIT-0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "BSL-1.0",
+    # The Mozilla CA root bundle that webpki-roots ships is data, licensed as
+    # a permissive data licence rather than a software one.
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+# Two versions of one crate is a smell, not a crime — but in a crypto
+# dependency it is worth a human look, so it warns rather than passing quietly.
+multiple-versions = "warn"
+wildcards = "deny"
+# The crates in this workspace depend on each other by path and carry no
+# version requirement; that is not the unpinned-dependency risk this check is
+# for.
+allow-wildcard-paths = true
+# Nothing in this project should ever pull in a crate that hands the process
+# an unbounded amount of attacker-controlled work at parse time; if one of
+# these appears, it arrived transitively and deserves an explanation.
+deny = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

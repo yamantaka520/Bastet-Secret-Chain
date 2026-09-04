@@ -1,8 +1,9 @@
 # Bastet Secret Chain — Master Plan
 
-**Status:** M0–M6 delivered; released as `v0.1.0` on 2026-09-04. M7 (hardening,
-signed binaries, dependency refresh, external review) not started. Per-milestone
-evidence and gaps live in the `M*_VALIDATION.md` files.
+**Status:** M0–M7 delivered; `v0.1.0` and `v0.2.0` tagged on 2026-09-04. The
+one thing M7 could not deliver is the external review itself — the checklist
+for it is [`EXTERNAL_REVIEW.md`](EXTERNAL_REVIEW.md). Per-milestone evidence
+and gaps live in the `M*_VALIDATION.md` files.
 **Authority:** this file is the single authority for scope, architecture,
 milestones, and gates. Any other document that disagrees with it is stale.
 
@@ -260,7 +261,7 @@ recorded in this repository and mirrored to BastetMind.
 | M4 | delivered 2026-09-04 — 95 tests, CI run `33777806776` with three release artifacts; LaunchAgent install / kill-restart / uninstall observed on a real Mac; **reboot itself not performed on any platform** | [`M4_VALIDATION.md`](M4_VALIDATION.md) |
 | M5 | complete, 2026-09-04 — real Codex CLI and Claude Code runs through `bsc mcp` each crossed a token renewal and a human approval; recipes for Claude Code / Codex / Agy / scripts | [`M5_VALIDATION.md`](M5_VALIDATION.md), [`AGENT_INTEGRATION.md`](AGENT_INTEGRATION.md) |
 | M6 | complete, 2026-09-04 — ① unattended unseal, ② `use_secret`, ③ Telegram approval channel, ④ pre-authorization, rotation cadence, passphrase rotation, item deletion, ⑤ audit-head anchoring (`bsc audit --anchor-file`) and break-glass export/import (`bsc export` / `bsc import`) | [`M6_VALIDATION.md`](M6_VALIDATION.md) |
-| M7 | not started | — |
+| M7 | delivered 2026-09-04 | [`M7_VALIDATION.md`](M7_VALIDATION.md) |
 
 ## 7. Open questions
 

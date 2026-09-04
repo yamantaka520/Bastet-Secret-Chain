@@ -22,6 +22,31 @@ Out of scope: a compromised host OS, an attacker with the operator's live
 session, hardware attacks, and coercion of the operator. These are recorded as
 out of scope in [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md).
 
+## Verifying a release
+
+Every release carries `SHA256SUMS`. From v0.2.0 that file is also signed with
+Sigstore keyless signing, and the signature is a `.cosign.bundle` beside it:
+
+```sh
+cosign verify-blob --bundle SHA256SUMS.cosign.bundle \
+  --certificate-identity-regexp "^https://github.com/yamantaka520/Bastet-Secret-Chain/.github/workflows/release.yml@refs/tags/" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  SHA256SUMS
+sha256sum -c SHA256SUMS            # then the archives against the sums
+```
+
+Build provenance is attested as well:
+
+```sh
+gh attestation verify bsc-<version>-<target>.tar.gz --repo yamantaka520/Bastet-Secret-Chain
+```
+
+Understand what this proves and what it does not. It proves the artifact was
+built by this repository's release workflow from this tag. It does **not**
+prove that a maintainer reviewed that tag: anyone who can push a tag here can
+produce a valid signature. There is no project signing key, and v0.1.0's
+artifacts predate signing entirely.
+
 ## Operating guidance
 
 - Keep the daemon on `127.0.0.1` unless you have a specific need and have read

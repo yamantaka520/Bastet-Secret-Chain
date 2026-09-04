@@ -44,6 +44,18 @@ impl KdfParams {
     /// above the OWASP minimum for Argon2id and is the production default.
     pub const MIN_M_COST_KIB: u32 = 8 * 1024;
 
+    /// Ceilings for parameters that were *read from a file* rather than chosen
+    /// by this program. A bundle or vault header is untrusted input: with
+    /// `m_cost_kib = u32::MAX` the reader asks Argon2 for 4 TiB and the process
+    /// dies long before the authentication tag could reject the file. Real
+    /// files use 64 MiB / 3 / 4, so these are far above anything legitimate and
+    /// far below a denial of service.
+    pub const MAX_M_COST_KIB: u32 = 1024 * 1024;
+    /// See [`Self::MAX_M_COST_KIB`].
+    pub const MAX_T_COST: u32 = 16;
+    /// See [`Self::MAX_M_COST_KIB`].
+    pub const MAX_P_COST: u32 = 16;
+
     /// Production defaults with a fresh random salt: 64 MiB, 3 passes, 4 lanes.
     pub fn recommended() -> Result<Self> {
         let mut salt = [0u8; SALT_LEN];
@@ -89,6 +101,28 @@ impl KdfParams {
             p_cost,
             salt,
         })
+    }
+
+    /// Check parameters decoded from a file before handing them to the KDF.
+    ///
+    /// Deliberately does **not** enforce [`Self::MIN_M_COST_KIB`]: a vault
+    /// written by an older or a test build must still open, and a weak KDF
+    /// costs its creator, not its reader. What it does enforce is that reading
+    /// a hostile or corrupt file cannot exhaust memory or time.
+    pub fn validate_from_file(&self) -> Result<()> {
+        if self.t_cost == 0 || self.p_cost == 0 || self.m_cost_kib == 0 {
+            return Err(CryptoError::Parameter("kdf parameter is zero"));
+        }
+        if self.m_cost_kib > Self::MAX_M_COST_KIB {
+            return Err(CryptoError::Parameter("m_cost above ceiling"));
+        }
+        if self.t_cost > Self::MAX_T_COST {
+            return Err(CryptoError::Parameter("t_cost above ceiling"));
+        }
+        if self.p_cost > Self::MAX_P_COST {
+            return Err(CryptoError::Parameter("p_cost above ceiling"));
+        }
+        Ok(())
     }
 
     /// Deliberately weak parameters for tests only. Named so it cannot be

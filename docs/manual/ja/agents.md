@@ -1,6 +1,6 @@
 # AI エージェントガイド
 
-**対象:** Bastet Secret Chain 0.1.0
+**対象:** Bastet Secret Chain 0.2.0
 **言語:** [繁體中文](../zh-Hant/agents.md) · [简体中文](../zh-Hans/agents.md) · [English](../en/agents.md) · **日本語** · [한국어](../ko/agents.md)
 **関連:** [インストール](install.md) · [ユーザーガイド](guide.md) · [API 契約](../../API_CONTRACT.md)
 

@@ -8,8 +8,8 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-bsc-crypto = { path = "../bsc-crypto" }
-bsc-store = { path = "../bsc-store" }
+bsc-crypto.workspace = true
+bsc-store.workspace = true
 axum.workspace = true
 base64.workspace = true
 reqwest.workspace = true

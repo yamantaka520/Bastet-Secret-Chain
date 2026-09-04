@@ -233,6 +233,13 @@ impl Vault {
             salt,
         };
 
+        // The vault file is normally ours, but "normally" is not a security
+        // argument: a corrupt or planted header must not be able to ask the
+        // KDF for terabytes before the passphrase is even tried.
+        params
+            .validate_from_file()
+            .map_err(|e| StoreError::Format(format!("kdf parameters: {e}")))?;
+
         let verifier_hex = require_meta(&conn, "verifier")?;
         let verifier_bytes =
             hex::decode(&verifier_hex).map_err(|_| StoreError::Format("bad verifier".into()))?;

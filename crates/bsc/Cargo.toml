@@ -12,10 +12,10 @@ name = "bsc"
 path = "src/main.rs"
 
 [dependencies]
-bsc-crypto = { path = "../bsc-crypto" }
-bsc-daemon = { path = "../bsc-daemon" }
-bsc-mcp = { path = "../bsc-mcp" }
-bsc-store = { path = "../bsc-store" }
+bsc-crypto.workspace = true
+bsc-daemon.workspace = true
+bsc-mcp.workspace = true
+bsc-store.workspace = true
 clap.workspace = true
 hex.workspace = true
 reqwest.workspace = true

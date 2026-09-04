@@ -1,6 +1,6 @@
 # Manuals · 手冊 · 手册 · マニュアル · 매뉴얼
 
-Bastet Secret Chain 0.1.0. Three manuals, five languages. Every edition has the
+Bastet Secret Chain 0.2.0. Three manuals, five languages. Every edition has the
 same structure, so a screenshot or a section number means the same thing in all
 of them.
 

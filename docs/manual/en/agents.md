@@ -1,6 +1,6 @@
 # AI agent guide
 
-**Applies to:** Bastet Secret Chain 0.1.0
+**Applies to:** Bastet Secret Chain 0.2.0
 **Languages:** [繁體中文](../zh-Hant/agents.md) · [简体中文](../zh-Hans/agents.md) · **English** · [日本語](../ja/agents.md) · [한국어](../ko/agents.md)
 **See also:** [Installation](install.md) · [User guide](guide.md) · [API contract](../../API_CONTRACT.md)
 

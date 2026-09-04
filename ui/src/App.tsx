@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
-import { makeT, type Key, type Locale } from "./i18n";
+import { isLocale, makeT, resolveLocale, type Key, type Locale } from "./i18n";
 import type { Status } from "./types";
 import { ToastProvider } from "./components/Toast";
 import Login from "./components/Login";
@@ -21,7 +21,12 @@ function useHash() {
 }
 
 export default function App() {
-  const [locale, setLocale] = useState<Locale>(() => (localStorage.getItem("bsc.locale") as Locale) || "zh-Hant");
+  const [locale, setLocale] = useState<Locale>(() => {
+    const saved = localStorage.getItem("bsc.locale");
+    // A stored choice wins; otherwise start in the browser's language, which
+    // is right more often than any fixed default.
+    return isLocale(saved) ? saved : resolveLocale(navigator.languages ?? [navigator.language]);
+  });
   const [theme, setTheme] = useState(() => localStorage.getItem("bsc.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
   const [status, setStatus] = useState<Status | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -61,13 +66,13 @@ export default function App() {
   const titles: Record<string, Key> = { dashboard: "nav_dashboard", items: "nav_items", tokens: "nav_tokens", approvals: "nav_approvals", sessions: "nav_sessions", expiry: "nav_expiry", audit: "nav_audit" };
 
   if (status === null) return <div className="login"><div className="card">…</div></div>;
-  if (!loggedIn) return <ToastProvider><Login t={t} onDone={() => { refresh(); loadStatus(); }} /></ToastProvider>;
+  if (!loggedIn) return <ToastProvider><Login t={t} locale={locale} onLang={setLocale} onDone={() => { refresh(); loadStatus(); }} /></ToastProvider>;
 
   return (
     <ToastProvider>
       <Shell t={t} route={route} status={status} pending={pending} theme={theme} refresh={refresh}
         onTheme={() => setTheme((x) => (x === "dark" ? "light" : "dark"))}
-        onLang={() => setLocale((l) => (l === "zh-Hant" ? "en" : "zh-Hant"))}
+        locale={locale} onLang={setLocale}
         onLock={async () => { await api.seal(); seenApprovals.current.clear(); loadStatus(); }}
         notifState={notifState}
         onNotif={() => Notification.requestPermission().then((p) => setNotifState(p))}

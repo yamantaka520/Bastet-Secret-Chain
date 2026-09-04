@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { Key } from "../i18n";
+import { LOCALES, type Key, type Locale } from "../i18n";
 import type { Session, Status } from "../types";
 import { api } from "../api";
 import { fmtDuration, parseList, secondsUntil } from "../util";
@@ -19,7 +19,7 @@ const NAV: { route: string; key: Key; emoji: string }[] = [
 
 export default function Shell(props: {
   t: T; route: string; status: Status | null; pending: number; children: ReactNode;
-  theme: string; onTheme: () => void; onLang: () => void; onLock: () => void;
+  theme: string; onTheme: () => void; locale: Locale; onLang: (l: Locale) => void; onLock: () => void;
   notifState: "default" | "granted" | "denied" | "unsupported"; onNotif: () => void; title: string; refresh: () => void;
 }) {
   const { t, route, pending } = props;
@@ -36,7 +36,10 @@ export default function Shell(props: {
         <div className="spacer" />
         <div className="foot">
           <button className="btn sm ghost" onClick={props.onTheme} title={t("theme")}>{props.theme === "dark" ? "🌙" : "☀️"}</button>
-          <button className="btn sm ghost" onClick={props.onLang}>{t("lang")}</button>
+          <select className="btn sm ghost lang" value={props.locale} aria-label={t("lang")} title={t("lang")}
+            onChange={(e) => props.onLang(e.target.value as Locale)}>
+            {LOCALES.map((l) => <option key={l.code} value={l.code}>{l.native}</option>)}
+          </select>
           {props.notifState !== "unsupported" && props.notifState !== "denied" && (
             <button className="btn sm ghost" onClick={props.onNotif} disabled={props.notifState === "granted"}>
               {props.notifState === "granted" ? t("notif_on") : t("notif_perm")}

@@ -1,6 +1,6 @@
 # Agent integration
 
-**Status:** current as of 0.1.0, 2026-09-04. Step-by-step manuals in five
+**Status:** current as of 0.2.0, 2026-09-04. Step-by-step manuals in five
 languages: [`docs/manual/`](manual/) — this file is the per-client reference. How an agent reaches the vault, in order of
 preference, and what to tell it. The MCP server is the default (ADR 0006); the
 HTTP API is for scripts, CI, and anything that does not speak MCP.

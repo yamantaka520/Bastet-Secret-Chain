@@ -1,6 +1,6 @@
 # AI 에이전트 가이드
 
-**적용 대상:** Bastet Secret Chain 0.1.0
+**적용 대상:** Bastet Secret Chain 0.2.0
 **언어:** [繁體中文](../zh-Hant/agents.md) · [简体中文](../zh-Hans/agents.md) · [English](../en/agents.md) · [日本語](../ja/agents.md) · **한국어**
 **함께 보기:** [설치](install.md) · [사용자 가이드](guide.md) · [API 계약](../../API_CONTRACT.md)
 

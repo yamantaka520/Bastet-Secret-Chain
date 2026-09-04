@@ -2,13 +2,15 @@
 # Install a released bsc binary for the current user and verify its checksum
 # against the SHA256SUMS published with the same release.
 #
-#   sh install.sh v0.1.0            # specific version (recommended)
-#   BSC_BIN_DIR=~/bin sh install.sh v0.1.0
+#   sh install.sh v0.2.0            # specific version (recommended)
+#   BSC_BIN_DIR=~/bin sh install.sh v0.2.0
 #
-# This verifies integrity (the archive matches the published sums), not
-# authenticity (that the sums came from the maintainer): both are fetched from
-# the same GitHub Release. Signed releases are scheduled for M7. Read this file
-# before running it; do not pipe it from the network into a shell.
+# This checks integrity: the archive matches the sums published beside it. It
+# does not by itself check who built it, because both come from the same
+# release page. From v0.2.0 the sums are signed with Sigstore as well —
+# SECURITY.md has the `cosign verify-blob` command and says what it proves.
+# Read this file before running it; do not pipe it from the network into a
+# shell.
 set -eu
 
 REPO="yamantaka520/Bastet-Secret-Chain"

@@ -1,6 +1,6 @@
 # AI Agent 接入手冊
 
-**適用版本：**Bastet Secret Chain 0.1.0
+**適用版本：**Bastet Secret Chain 0.2.0
 **語言：** **繁體中文** · [简体中文](../zh-Hans/agents.md) · [English](../en/agents.md) · [日本語](../ja/agents.md) · [한국어](../ko/agents.md)
 **延伸閱讀：**[安裝手冊](install.md) · [使用手冊](guide.md) · [API 契約](../../API_CONTRACT.md)
 

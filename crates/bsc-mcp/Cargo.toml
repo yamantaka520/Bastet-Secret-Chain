@@ -17,7 +17,7 @@ zeroize.workspace = true
 
 [dev-dependencies]
 axum.workspace = true
-bsc-crypto = { path = "../bsc-crypto" }
-bsc-daemon = { path = "../bsc-daemon" }
-bsc-store = { path = "../bsc-store" }
+bsc-crypto.workspace = true
+bsc-daemon.workspace = true
+bsc-store.workspace = true
 tempfile.workspace = true

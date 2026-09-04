@@ -28,14 +28,18 @@ fn header_bytes(p: &KdfParams) -> Vec<u8> {
     h
 }
 
-fn aad_for(header: &[u8]) -> Aad<'static> {
-    // The header is bound through the field name: any change to it changes
-    // the AAD and the tag no longer verifies. `Aad` wants &str, so hex it.
-    let _ = header;
+/// The header is bound through the field name: any change to it changes the
+/// AAD and the tag stops verifying. `Aad` borrows a `&str`, so the caller
+/// keeps this label alive for the length of the call.
+fn header_label(header: &[u8]) -> String {
+    format!("bundle/{}", hex_lower(header))
+}
+
+fn aad_with_header(label: &str) -> Aad<'_> {
     Aad {
         item_id: "",
         version: 0,
-        field: "bundle",
+        field: label,
     }
 }
 
@@ -44,8 +48,9 @@ fn aad_for(header: &[u8]) -> Aad<'static> {
 pub fn seal_bundle(passphrase: &[u8], params: &KdfParams, plaintext: &[u8]) -> Result<Vec<u8>> {
     let kek = Kek::derive(passphrase, params)?;
     let header = header_bytes(params);
+    let label = header_label(&header);
     let mut body = header.clone();
-    let sealed = seal_field(&kek, &aad_with_header(&header), plaintext)?;
+    let sealed = seal_field(&kek, &aad_with_header(&label), plaintext)?;
     body.extend_from_slice(&sealed.to_vec());
     Ok(body)
 }
@@ -66,24 +71,14 @@ pub fn open_bundle(passphrase: &[u8], bundle: &[u8]) -> Result<Zeroizing<Vec<u8>
         p_cost: u(base + 8),
         salt,
     };
-    if params.t_cost == 0 || params.p_cost == 0 || params.m_cost_kib < 8 {
-        return Err(CryptoError::Encoding);
-    }
-    let kek = Kek::derive(passphrase, &params)?;
+    // The parameters come from the file, and the file is not ours: check them
+    // before the KDF is asked to honour them. Everything else here is cheap,
+    // so a hostile bundle costs a few microseconds, not the machine.
+    params.validate_from_file()?;
     let sealed = Sealed::from_slice(&bundle[HEADER_LEN..])?;
-    open_field(&kek, &aad_with_header(header), &sealed)
-}
-
-fn aad_with_header(header: &[u8]) -> Aad<'static> {
-    // Bind the header by folding it into the field label. Leaking via a
-    // Box is acceptable: a handful of bundle operations per process.
-    let label: &'static str = Box::leak(format!("bundle/{}", hex_lower(header)).into_boxed_str());
-    let _ = aad_for(header);
-    Aad {
-        item_id: "",
-        version: 0,
-        field: label,
-    }
+    let kek = Kek::derive(passphrase, &params)?;
+    let label = header_label(header);
+    open_field(&kek, &aad_with_header(&label), &sealed)
 }
 
 fn hex_lower(b: &[u8]) -> String {

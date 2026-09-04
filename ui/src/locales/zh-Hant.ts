@@ -1,0 +1,53 @@
+// Traditional Chinese (Taiwan) — the reference dictionary.
+//
+// This file defines `Dict`: every other locale is typed against it, so a
+// missing or misspelled key is a compile error, not a runtime `??? key`.
+// Terminology follows the manuals in docs/manual/zh-Hant/.
+const zhHant = {
+  app: "Bastet Secret Chain",
+  nav_dashboard: "總覽", nav_items: "機敏資料", nav_tokens: "Agent Token", nav_approvals: "核准收件匣",
+  nav_sessions: "任務窗口", nav_expiry: "到期追蹤", nav_audit: "稽核鏈", lock: "上鎖", theme: "主題", lang: "語言",
+  unseal_title: "解封保險庫", unseal_hint: "密語只會送到這台機器上的 daemon,不會離開本機。", passphrase: "密語",
+  unseal: "解封", unsealing: "解封中…", bad_passphrase: "密語錯誤",
+  tile_items: "項目", tile_expiring: "30 天內到期", tile_pending: "待核准", tile_sessions: "進行中任務窗口",
+  tile_tokens: "有效 token", tile_chain: "稽核鏈", chain_intact: "完整", chain_broken: "第 {n} 筆斷鏈",
+  search: "搜尋名稱、路徑、標籤 (/)", all_types: "所有類型", all_env: "所有環境",
+  new_item: "新增機敏資料", copy_ref: "複製參照", reveal: "顯示", new_version: "新版本",
+  copied_title: "已複製參照", copied_body: "這個 URL 本身不授予任何權限。Agent 還需要一把受限 token。", mint_for_this: "為這個項目鑄 token →",
+  approval_required: "需人工核准", local_only: "僅限本機核准", expiring: "即將到期", expired: "已到期",
+  version: "版本", size: "大小", created: "建立", updated: "更新", expires: "到期", never: "永不",
+  path: "路徑", name: "名稱", type: "類型", tags: "標籤 (逗號分隔)", env: "環境", value: "內容",
+  value_hint: "貼上值,或拖放憑證檔案 (JSON / PEM / p12) 到這裡。內容加密後才會寫入磁碟。", drop_here: "放開以加密上傳",
+  file_loaded: "已載入檔案 {name} ({size})", require_approval: "每次讀取都需要我核准", expires_at: "到期日 (選填)",
+  create: "建立並加密", creating: "加密中…", cancel: "取消", save: "儲存", close: "關閉",
+  reveal_title: "顯示內容", reveal_needs_pw: "這個項目需要核准。請再次輸入密語。", reveal_hide_in: "{s} 秒後自動隱藏",
+  copy_value: "複製值", value_copied: "值已複製到剪貼簿——記得在用完後清空剪貼簿。",
+  detail: "詳細", audit_tab: "稽核紀錄", versions: "版本歷史", note: "備註 (選填)", add_version: "新增版本",
+  tokens_title: "Agent Token", mint: "鑄造 token", label: "標籤", scope_paths: "路徑範圍（逗號分隔前綴；test 即含 test/ 底下全部，也接受 test/*）", scope_tags: "標籤範圍",
+  lifetime: "壽命", max_reads: "讀取次數上限 (留空=不限)", rate: "每分鐘上限", revoke: "撤銷", revoked: "已撤銷",
+  live: "有效", expired_t: "已過期", reads: "讀取", minted_title: "token 已鑄造——只會顯示這一次",
+  minted_body: "把它放進 Agent 的 MCP 設定 (BSC_TOKEN),不要貼進對話。關閉後無法再看到。", copy_token: "複製 token",
+  approvals_title: "核准收件匣", no_pending: "目前沒有待核准的請求 ✨", approve: "核准 (a)", deny: "拒絕 (d)",
+  wants: "想讀取", reason_label: "Agent 說的理由", auto_deny_in: "{s} 後自動拒絕", escalated: "已升級 {n} 階",
+  sessions_title: "任務窗口", start_session: "▶️ 開始任務", end_session: "結束", session_active: "任務中 · 剩 {t}",
+  duration: "時長", min15: "15 分鐘", min30: "30 分鐘", min60: "1 小時", min120: "2 小時",
+  session_hint: "窗口內、範圍內的讀取只記錄不打擾。窗口到期不會自動延長。", no_sessions: "沒有進行中的任務窗口。",
+  expiry_title: "到期追蹤", expiry_items: "機敏資料", expiry_tokens: "Token", days_left: "{d} 天", hours_left: "{h} 小時", nothing_expiring: "沒有設定到期日的項目。",
+  audit_title: "稽核鏈", verify: "重新驗證", records: "筆紀錄", head: "鏈首", when: "時間", actor: "執行者", action: "動作", subject: "對象", outcome: "結果",
+  prev: "上一頁", next: "下一頁", sealed_banner: "保險庫已上鎖。名稱與內容不可讀,列表只顯示中繼資料。",
+  error_generic: "發生錯誤", notif_perm: "🔔 開啟桌面通知", notif_on: "🔔 通知已開啟",
+  type_login: "登入帳密", type_api_key: "API Key", type_cloud_key: "雲服務金鑰", type_service_account: "服務帳戶 JSON",
+  type_oauth: "OAuth", type_ssh_key: "SSH 金鑰", type_certificate: "憑證", type_file: "檔案",
+  env_prod: "prod", env_staging: "staging", env_dev: "dev", env_personal: "personal",
+  tree_all: "全部", keyboard_hint: "快捷鍵: / 搜尋 · Esc 關閉 · 收件匣 a/d",
+  use_tab: "使用綁定", use_hint: "讓 Agent 「用」這把憑證而不「看」它:保險庫代為對下列 URL 發出請求並注入 header。留空 = 不允許 use_secret。",
+  use_urls: "允許的 URL 樣式 (每行一個,https:// 開頭,結尾 * 表示前綴)", use_header: "注入的 header 模板 ({value} 會被替換)", use_methods: "允許的方法",
+  use_save: "儲存綁定", use_clear: "清除綁定", use_saved: "使用綁定已更新", use_badge: "可代發",
+  rotation_days: "輪替週期 (天,選填)", rotation_due: "輪替逾期", rotation_due_in: "{d} 天後該輪替",
+  delete_item: "刪除項目", delete_confirm: "確定刪除「{name}」?密文會被移除,稽核紀錄保留。", delete_reason: "刪除原因", deleted: "已刪除",
+  grants_title: "預先授權", grant_new: "預先授權", grant_hint: "讓某把 token 在指定時間內讀取某個需核准的項目而不再提示。到期不會自動延長。", grant_token: "Token", grant_item: "項目", grant_ttl: "有效時間", grant_source_pre: "預先授權", grant_source_approval: "核准後", grant_until: "有效至", grant_revoke: "撤回", no_grants: "目前沒有有效的授權。",
+  change_pw: "更換密語", current_pw: "目前密語", new_pw: "新密語 (至少 12 字元)", change_pw_hint: "會重新包封所有資料金鑰並重建索引;其他登入會被登出。", pw_changed: "密語已更換,請重新登入。",
+};
+
+export type Dict = typeof zhHant;
+export default zhHant;
