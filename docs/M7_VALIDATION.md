@@ -76,9 +76,36 @@ What the restore drill establishes, specifically:
 - A wrong export passphrase is refused three ways, and a failed import leaves
   no rows behind.
 
-Fuzzing has run only in CI, and only for the bounded times above. No crash has
-been found; that is a weak statement after minutes of fuzzing, and it is the
-honest one.
+### What the fuzzing actually covered
+
+First green run, 60 s per target on an Actions runner (the first attempt failed
+outright: `rust-toolchain.toml` pins stable for the repository and overrode the
+nightly the workflow installed, so nothing built — worth stating, because a
+fuzz job that fails to build looks much like one that finds nothing):
+
+| Target | Executions | Coverage | Corpus | Crashes |
+| --- | --- | --- | --- | --- |
+| `sealed` | 42.7 M | 23 edges | 2 | none |
+| `bundle` | 41.2 M | 34 edges | 3 | none |
+| `anchor_line` | 2.7 M | 1181 edges | 2677 | none |
+| `export_json` | 11.2 M | 1800 edges | 2502 | none |
+
+Read those numbers honestly. `sealed` and `bundle` execute enormously fast and
+explore almost nothing, because both formats are authenticated: without the
+key, a mutated byte string fails the tag and the fuzzer never reaches the code
+behind it. What they do test is the part that runs *before* authentication —
+length checks, the magic, the header decode, the KDF parameter ceiling — which
+is exactly where the bug above lived, and exactly the code an attacker reaches
+without a key.
+
+The two JSON targets explore properly (thousands of corpus entries, four-figure
+coverage) and they are the ones that matter for what runs *after*
+authentication: `export_json` is the document a decrypted bundle produces, and
+`anchor_line` is a file that lives outside the vault by design.
+
+No crash has been found. After a minute per target that is a weak statement,
+and it is the honest one; the weekly run is 15 minutes and starts cold, which
+is the next thing worth fixing.
 
 ## Not done — explicitly
 
@@ -89,8 +116,13 @@ honest one.
   prove a maintainer approved the release, and anyone who can push a tag can
   produce a valid signature. A hardware-key-backed signature is not planned.
 - **v0.1.0's artifacts are not signed** — signing starts at v0.2.0.
-- **Fuzzing corpora are not persisted between runs**, so each run starts cold.
-  A corpus cache would find more, and is worth doing before claiming coverage.
+- **Fuzzing corpora are not persisted between runs**, so each run starts cold —
+  including the weekly one, which therefore spends its first minutes
+  rediscovering what the last run already knew. A corpus cache is the single
+  highest-value improvement here.
+- **The authenticated formats are barely explored** (23 and 34 edges): fuzzing
+  cannot get past an AEAD tag without the key. Fuzzing the post-decryption path
+  properly would need a harness that seals its own input, which does not exist.
 - **The Web UI has still had no XSS review**, and the dependency tree has had
   no hand audit; `cargo deny` is a policy check, not a reading.
 - **The production restore has not been performed by a human**, which is the
