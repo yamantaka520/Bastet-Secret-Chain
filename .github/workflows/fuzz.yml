@@ -36,12 +36,15 @@ jobs:
       - name: Install cargo-fuzz
         run: cargo install cargo-fuzz --locked
       - name: Run
+        # `+nightly` explicitly: rust-toolchain.toml at the repository root
+        # pins stable, and an override in the file beats the default the
+        # toolchain action set.
         env:
           # A minute per target on push is enough to catch a regression; the
           # weekly run is what explores.
           SECONDS_TO_RUN: ${{ github.event_name == 'schedule' && '900' || '60' }}
         run: |
-          cargo fuzz run ${{ matrix.target }} -- \
+          cargo +nightly fuzz run ${{ matrix.target }} -- \
             -max_total_time=$SECONDS_TO_RUN -rss_limit_mb=4096 -print_final_stats=1
       - name: Upload crash
         if: failure()

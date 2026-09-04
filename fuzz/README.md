@@ -6,9 +6,14 @@ arrive from outside the vault (an anchor line, an export bundle).
 
 ```sh
 cargo install cargo-fuzz
+rustup toolchain install nightly     # -Zsanitizer is nightly-only
 cargo +nightly fuzz run bundle -- -max_total_time=300
 cargo +nightly fuzz list
 ```
+
+`fuzz/rust-toolchain.toml` selects nightly inside this directory; the `+nightly`
+above is belt and braces for when cargo is invoked from the repository root,
+where the pin is stable.
 
 CI runs every target for a bounded time on each push to `main` and for longer
 on a weekly schedule; a crash is uploaded as an artifact and fails the job.

@@ -1,0 +1,4 @@
+# libFuzzer needs -Zsanitizer, which is nightly-only. The repository root pins
+# stable for everything else; this file keeps that pin from reaching in here.
+[toolchain]
+channel = "nightly"
