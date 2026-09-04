@@ -41,7 +41,7 @@ environment so the file can be shared:
 Set `BSC_TOKEN` in the shell that launches Claude Code, or point at a file:
 `"args": ["mcp", "--token-file", "/Users/you/.bsc/tokens/claude-code"]` with
 that file `0600`. Against the deployed instance use
-`"--url", "https://sec.bastet.tw"`.
+`"--url", "https://secrets.example.com"`.
 
 Non-interactive runs (the pattern the M5 gate test uses):
 

@@ -162,7 +162,7 @@ systemctl status bsc
 
 ### 4.3 nginx 与 TLS
 
-从 [`deploy/nginx-sec.bastet.tw.conf`](../../../deploy/nginx-sec.bastet.tw.conf) 改起。真正重要的是这几点：
+从 [`deploy/nginx-bsc.conf`](../../../deploy/nginx-bsc.conf) 改起。真正重要的是这几点：
 
 - 一张真证书，HTTP 跳转到 HTTPS；
 - `proxy_pass http://127.0.0.1:8787;`，并用真正的客户端地址填 `X-Forwarded-For`（在 Cloudflare 后面就用 `CF-Connecting-IP`）；

@@ -211,7 +211,7 @@ the ledger. Without it, remote browsers are refused.
 
 ### 4.3 nginx and TLS
 
-Start from [`deploy/nginx-sec.bastet.tw.conf`](../../../deploy/nginx-sec.bastet.tw.conf).
+Start from [`deploy/nginx-bsc.conf`](../../../deploy/nginx-bsc.conf).
 The parts that matter:
 
 - a real certificate, HTTP redirected to HTTPS;

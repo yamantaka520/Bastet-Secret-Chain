@@ -178,7 +178,7 @@ same item can live in one place and still be found many ways.
 - **Remote exposure:** opt-in only, requires TLS with a certificate the
   operator supplies, mutual TLS or a network allow-list, and a recorded
   acknowledgement written to the audit chain.
-  *Pulled forward on 2026-09-04* for `sec.bastet.tw`: the daemon still binds
+  *Pulled forward on 2026-09-04* for a production deployment: the daemon still binds
   loopback; `bsc serve --public-origin` accepts one external origin, marks the
   cookie `Secure`, throttles logins per forwarded client, and writes
   `exposure_acknowledged`. The operator chose the vault's own authentication

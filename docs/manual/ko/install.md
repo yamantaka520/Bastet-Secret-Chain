@@ -210,7 +210,7 @@ systemctl status bsc
 
 ### 4.3 nginx와 TLS
 
-[`deploy/nginx-sec.bastet.tw.conf`](../../../deploy/nginx-sec.bastet.tw.conf)에서
+[`deploy/nginx-bsc.conf`](../../../deploy/nginx-bsc.conf)에서
 시작하십시오. 중요한 부분은 다음과 같습니다.
 
 - 실제 인증서, 그리고 HTTP에서 HTTPS로의 리다이렉트;

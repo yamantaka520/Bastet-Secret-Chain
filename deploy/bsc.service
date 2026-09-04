@@ -11,7 +11,7 @@ Wants=network-online.target
 Type=simple
 User=bsc
 Group=bsc
-ExecStart=/usr/local/bin/bsc serve --vault /var/lib/bsc/vault.bsc --bind 127.0.0.1:8790 --public-origin https://sec.bastet.tw
+ExecStart=/usr/local/bin/bsc serve --vault /var/lib/bsc/vault.bsc --bind 127.0.0.1:8790 --public-origin https://secrets.example.com
 Restart=on-failure
 RestartSec=2
 Environment=RUST_LOG=info

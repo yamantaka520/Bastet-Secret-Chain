@@ -62,7 +62,7 @@ What the tests establish, per step:
   to open, and a round trip into a fresh vault restores two versions, flags,
   and the use binding under new srefs.
 
-## Production state on `sec.bastet.tw` at the time of writing
+## Production state at the time of writing
 
 - Binary on the host: `0.1.0+f23d51a`, installed 2026-09-04 from the
   `v0.1.0` GitHub Release asset (SHA256SUMS and build-provenance attestation
@@ -133,14 +133,14 @@ decides to remove it.
 
 Operator-created probe: item `test/telegram-probe` (api_key, approval
 required), token `telegram-probe` scoped to `test`, value saved on the host
-only. Agent side run over `ssh ssh.bastet.tw` with curl against loopback.
+only. Agent side run in a shell on the host, with curl against loopback.
 
 | UTC | Event | Evidence |
 | --- | --- | --- |
 | 20:58:33 | `GET /v1/secrets/{sref}` → **202** `approval_pending`, `apr_aba0c373addfa1a7`, poll hint 5 s, 5-min expiry | response body; ledger 33 `approval_requested` |
 | 20:58:33 / 20:58:54 | ladder steps 1 and 2 (local notifier only) | ledger 34, 35 `approval_escalated` |
-| 20:59:35 | step 3: one Telegram message with ✅/⛔ to chat 8686567559 | ledger 36 `approval_escalated`, 37 `approval_notified` `{channel: telegram, buttons: true}` |
-| 20:59:52 | operator pressed ✅ on the phone | ledger 38 `approval_decided` **approved** by `external:telegram:8686567559`, grant issued |
+| 20:59:35 | step 3: one Telegram message with ✅/⛔ to the operator's chat | ledger 36 `approval_escalated`, 37 `approval_notified` `{channel: telegram, buttons: true}` |
+| 20:59:52 | operator pressed ✅ on the phone | ledger 38 `approval_decided` **approved** by `external:telegram:<operator>`, grant issued |
 | 20:59:52 | poll returned `approved` with the value (19 bytes, correct) | ledger 39 `secret_read` |
 | after | second read under the TOFU grant → 200 with no new approval | see below |
 

@@ -1,20 +1,10 @@
 # Deploying behind a reverse proxy
 
-**Status:** live since 2026-09-04 02:22 (UTC+8) at `https://sec.bastet.tw` on
-the host `192.168.100.250` (Ubuntu 26.04, nginx 1.28): `bsc.service` active
-and enabled as user `bsc`, vault created by the operator, daemon sealed until
-the operator unseals it in the UI. Verified from another machine:
-`/v1/vault/status` → `{"public_origin":"https://sec.bastet.tw","sealed":true}`,
-document served with CSP and HSTS through Cloudflare, `bsc doctor
---url https://sec.bastet.tw` ✅ daemon / ✅ bind (acknowledged public origin) /
-✅ web ui, and `bsc mcp --url https://sec.bastet.tw` answering in the error
-contract over TLS. Two defects were found and fixed by that check: the binary
-had no TLS backend at all, and `doctor` failed every non-loopback URL. Cloudflare proxies the hostname
-(orange cloud) and reaches nginx through the site's public IP and a router
-port-forward on 443 — **not** through the host's Cloudflare Tunnel, which
-carries only `mizuki-line.bastet.tw` and, since this work, `ssh.bastet.tw`. This pulls the master plan's remote-exposure gate (§4.4) forward from
-M6/M7 at the operator's request; what was implemented and what was not is
-listed at the end.
+**Status:** validated on one production deployment. This document is the
+recipe and the reasoning, with no site-specific detail in it: substitute your
+own hostname for `secrets.example.com` throughout. Operational specifics of a
+particular deployment — addresses, host names, allow-lists, tunnel or account
+identifiers — do not belong in a public repository, and are not here.
 
 ## What changes when the daemon is exposed
 
@@ -48,27 +38,26 @@ With the vault's own authentication as the only gate, the passphrase form is
 reachable by anyone who can reach the hostname. The defenses are the Argon2id
 cost (64 MiB / 3 passes per attempt), the two throttles (daemon and nginx),
 `login denied` ledger records, and the fact that a passphrase never leaves the
-form except over TLS. This is the arrangement the operator chose for
-`sec.bastet.tw` on 2026-09-04 as a first step. The stronger options remain
-available and are recommended:
+form except over TLS. That is a defensible first step and it is what the
+reference deployment started with, but the stronger options are worth taking:
 
-- **Cloudflare Access** in front of the UI paths (`/`, `/assets/*`,
-  `/v1/vault/*`, `/v1/items*`, `/v1/tokens*`, `/v1/sessions*`,
-  `/v1/approvals*`, `/v1/audit*`), leaving the agent paths
-  (`/v1/secrets*`, `/v1/access-requests*`, `/v1/token*`) to bearer tokens or
-  an Access service token. The operator already runs a tunnel, so this is
-  dashboard work rather than new infrastructure.
-- **An IP allow-list** in nginx keyed on `CF-Connecting-IP` for the UI paths.
+- **An identity proxy** (Cloudflare Access, oauth2-proxy, your SSO) in front of
+  the UI paths — `/`, `/assets/*`, `/v1/vault/*`, `/v1/items*`, `/v1/tokens*`,
+  `/v1/sessions*`, `/v1/approvals*`, `/v1/audit*` — leaving the agent paths
+  (`/v1/secrets*`, `/v1/access-requests*`, `/v1/token*`) to bearer tokens or a
+  service token, since an agent cannot complete an interactive login.
+- **An IP allow-list** in nginx for the UI paths, keyed on the real client
+  address.
 
-## Host layout used
+## Host layout
 
 ```
-/usr/local/bin/bsc                  the release binary (from the CI artifact)
-/var/lib/bsc/                       0700, owner bsc:bsc
-/var/lib/bsc/vault.bsc              0600, created by the operator with `bsc init`
-/etc/systemd/system/bsc.service     deploy/bsc.service (system unit, User=bsc)
-/etc/nginx/sites-available/sec.bastet.tw   deploy/nginx-sec.bastet.tw.conf
-/etc/nginx/snippets/bsc-proxy.conf         deploy/nginx-bsc-proxy.snippet.conf
+/usr/local/bin/bsc                          the release binary
+/var/lib/bsc/                               0700, owner bsc:bsc
+/var/lib/bsc/vault.bsc                      0600, created by the operator
+/etc/systemd/system/bsc.service             deploy/bsc.service (system unit, User=bsc)
+/etc/nginx/sites-available/<your-host>      deploy/nginx-bsc.conf
+/etc/nginx/snippets/bsc-proxy.conf          deploy/nginx-bsc-proxy.snippet.conf
 ```
 
 The vault is created by the operator, interactively, so the passphrase is
@@ -79,26 +68,32 @@ sudo -u bsc /usr/local/bin/bsc init --vault /var/lib/bsc/vault.bsc
 ```
 
 Then `sudo systemctl enable --now bsc`, `sudo nginx -t && sudo systemctl reload
-nginx`, and from anywhere: `bsc doctor --url https://sec.bastet.tw` (the vault
-checks are skipped when the file is not local; the daemon, UI, bind, and
-clock checks still run).
+nginx`, and from another machine `bsc doctor --url https://secrets.example.com`
+(the vault checks are skipped when the file is not local; the daemon, UI, bind
+and clock checks still run).
 
-### Unattended unseal (added the same day)
+Why a **system** unit rather than `bsc service install`: the latter writes a
+user unit, which on a server would need `loginctl enable-linger` and would run
+as an interactive account. A dedicated `bsc` user with `ProtectSystem=strict`,
+`ProtectHome=true` and a single `ReadWritePaths` is the right shape for a host
+that runs other things.
+
+## Unattended unseal
 
 A server that restarts into a sealed vault is a server nobody can use until
-someone opens the UI. `deploy/bsc-unattended.conf` is a drop-in that stores
-the passphrase as a **systemd encrypted credential** (TPM2-sealed where the
-host has one, otherwise sealed to the root-only host key) and passes it to the
+someone opens the UI. `deploy/bsc-unattended.conf` is a drop-in that stores the
+passphrase as a **systemd encrypted credential** (TPM2-sealed where the host
+has one, otherwise sealed to the root-only host key) and passes it to the
 daemon at start via `LoadCredentialEncrypted`; the daemon reads
 `$CREDENTIALS_DIRECTORY/bsc-passphrase`, unseals, zeroizes, and writes
 `unseal_unattended` (source `systemd-credential`) to the ledger. The operator
 creates the credential once by typing the passphrase into
 `systemd-creds encrypt` — it is never on a command line or in a file in the
-clear. The trade is stated in the drop-in: root on the host can now decrypt,
-so the vault is as private as the host. A wrong credential makes the unit
-fail rather than start sealed, so a broken deployment is loud.
+clear. The trade is stated in the drop-in: root on the host can decrypt it, so
+the vault is as private as the host. A wrong credential makes the unit fail
+rather than start sealed, so a broken deployment is loud.
 
-### Telegram approval channel (ADR 0005 §4)
+## Telegram approval channel (ADR 0005 §4)
 
 `bsc serve --telegram-token-credential telegram-token --telegram-chat <chat id>
 [--telegram-user <id>]…` turns on the outbound channel: at the third ladder
@@ -109,133 +104,30 @@ are honoured, optionally only from the listed user ids; items flagged
 🏠 local-approval-only are announced without buttons and a forged press is
 refused. The decision is ledgered as `external:telegram:<user id>`, the
 delivery as `approval_notified`. The bot token is a second systemd encrypted
-credential (`LoadCredentialEncrypted=telegram-token:/etc/bsc/telegram.cred`;
-`deploy/telegram-setup.sh` does the whole dance on the host: token typed
-locally, validated, encrypted, chat/user id discovered from one message)
-— never on a command line. Not enabled on `sec.bastet.tw` until the operator
-supplies a bot and a chat.
+credential (`LoadCredentialEncrypted=telegram-token:/etc/bsc/telegram.cred`);
+`deploy/telegram-setup.sh` does the whole dance on the host — token typed
+locally, validated, encrypted, chat and user id discovered from one message —
+so the token is never on a command line.
 
-Why a **system** unit rather than `bsc service install`: the latter writes a
-user unit, which on a server would need `loginctl enable-linger` and would
-run as an interactive account. A dedicated `bsc` user with `ProtectSystem=
-strict`, `ProtectHome=true`, and a single `ReadWritePaths` is the right shape
-for a host that runs other things.
+## If a CDN or proxy network sits in front
 
-## Cloudflare specifics
-
-- Cloudflare's proxy connects to nginx on the public IP; nginx sees Cloudflare
-  as `$remote_addr` and the real client in `CF-Connecting-IP`. The site config
-  maps that into `X-Forwarded-For` and **overwrites** any inbound value, so a
-  client cannot supply its own.
-- Cloudflare terminates the public TLS and re-encrypts to nginx with the
-  wildcard `*.bastet.tw` certificate, so `sec.bastet.tw` is only as private as
-  the Cloudflare account — the same trade the rest of `bastet.tw` already
-  makes.
-- **The origin is directly reachable.** Anyone who knows the public IP can
-  send `Host: sec.bastet.tw` straight to nginx on 443, bypassing Cloudflare
-  (verified with `curl --resolve`). The vault's own authentication and
-  throttle still apply, but Cloudflare-side controls (Access, WAF, rate
-  limits) would not. Mitigation when wanted: restrict 443 on the router or
-  host firewall to Cloudflare's published IP ranges, or move the hostname
-  onto the tunnel and close the port-forward. Not done; recorded.
-- The daemon does not know about Cloudflare; it knows one origin and one
+- The proxy connects to nginx; nginx sees the proxy as `$remote_addr` and the
+  real client in a provider header (`CF-Connecting-IP` for Cloudflare). The
+  site config maps that into `X-Forwarded-For` and **overwrites** any inbound
+  value, so a client cannot supply its own.
+- If the provider terminates public TLS and re-encrypts to your origin with a
+  wildcard certificate, the hostname is only as private as that provider
+  account.
+- **Check whether your origin is directly reachable.** If the origin's address
+  is guessable and port 443 is open to the world, anyone can send
+  `Host: secrets.example.com` straight to nginx and bypass every control the
+  provider offers — Access, WAF, rate limits — leaving only the vault's own
+  authentication and throttle. Verify with `curl --resolve`. Mitigate by
+  restricting 443 to the provider's published ranges at the firewall, or by
+  serving the hostname through an outbound tunnel and closing the inbound
+  port. This is the most commonly missed step in this kind of deployment.
+- The daemon knows nothing about any of this. It knows one origin and one
   forwarded-for header.
-
-## SSH over the same Cloudflare Tunnel (`ssh.bastet.tw`)
-
-Requested alongside this deployment: reach the host's sshd through the
-existing tunnel `d276e209-…`, allowed only from two IPs.
-[`deploy/cloudflare-ssh-tunnel.sh`](../deploy/cloudflare-ssh-tunnel.sh) does
-it idempotently through the API with a token read from a file:
-
-1. **Tunnel ingress** — adds `ssh.bastet.tw → ssh://localhost:22` ahead of the
-   catch-all, keeping the existing `mizuki-line.bastet.tw` rule. *Done.*
-2. **DNS** — a proxied CNAME `ssh.bastet.tw → <tunnel-id>.cfargotunnel.com`.
-   *Failed on the first run (token had Zone:Read but not DNS:Edit); created on
-   the second run after the operator widened the token.*
-3. **Access** — a self-hosted app of type `ssh` for the hostname with one
-   policy, **Bypass** when the client IP is `172.216.48.153/32`,
-   `59.124.17.34/32`, or `1.34.128.101/32` (the third added on request the
-   same day). Everything else is denied at Cloudflare's edge before reaching
-   the tunnel. *Done* (app `508fe70e-…`).
-
-Client side, on an allow-listed machine with `cloudflared` installed. The
-operator's standing instruction (2026-09-04): reach this host **only** as
-`ssh ssh.bastet.tw`, with the account (`manfred`, sudo/su) and key supplied by
-the client's own `~/.ssh/config`; the `CatWhiskers` account belongs to a
-different project and was used only for the initial setup:
-
-```
-Host ssh.bastet.tw
-  ProxyCommand cloudflared access ssh --hostname %h
-  User manfred
-  IdentityFile ~/.ssh/<key>
-```
-
-sshd on the host already has `PasswordAuthentication no` and
-`PubkeyAuthentication yes`, so the tunnel adds a network gate in front of an
-already key-only service; it does not replace key auth. Port 22 remains open
-on the LAN as before — closing it is a separate decision.
-
-Verified both ways on 2026-09-04:
-
-- **Denied** — before `1.34.128.101` was on the list, an HTTPS request from it
-  to `ssh.bastet.tw` at the Cloudflare edge returned **403** from Access.
-- **Allowed** — after adding it, `ssh -o ProxyCommand="cloudflared access ssh
-  --hostname %h" CatWhiskers@ssh.bastet.tw` run *from the host itself* (whose
-  egress is that same address) came back through Cloudflare and the tunnel:
-  `TUNNEL-OK host=hermes-agent user=CatWhiskers`, and sshd logged `Accepted
-  publickey for CatWhiskers from 127.0.0.1` — the connection arrives from
-  `cloudflared` on loopback, as designed. The key was lent to the host for the
-  test through a 10-minute agent forward, never copied.
-
-**GUI clients without `ProxyCommand` (SecureCRT, PuTTY, MobaXterm…).** Run
-`cloudflared` as a local listener and point the client at it:
-
-```
-cloudflared access tcp --hostname ssh.bastet.tw --url 127.0.0.1:2222
-```
-
-then connect the client to host `127.0.0.1`, port `2222`, protocol SSH2, user
-`manfred`, public-key authentication with that account's key. `cloudflared`
-must be running while the session is open; on Windows a logon-triggered
-scheduled task (`schtasks /Create /SC ONLOGON /TN "cloudflared ssh.bastet.tw"
-/TR "\"C:\Program Files (x86)\cloudflared\cloudflared.exe\" access tcp
---hostname ssh.bastet.tw --url 127.0.0.1:2222"`) keeps it up. The Access
-check happens at Cloudflare using the *client machine's* public IP, exactly
-as with `ProxyCommand`. On first connection the client shows the host key of
-`hermes-agent`; compare it with the fingerprints recorded below before
-accepting.
-
-Host key fingerprints of `hermes-agent` (read from `/etc/ssh` on the host on
-2026-09-04; sshd offers all three):
-
-```
-ED25519  SHA256:fifrQkgqWKDW+V0E8KV0Dq7ILuOuhlcnr4GqbJR3LBQ   MD5:89:32:0d:73:6f:46:b3:92:68:32:b5:6f:79:71:b8:29
-ECDSA    SHA256:29hLoIc4S816ss6ZD7ihy4qNQV9jseQKGkbhyUIBetE
-RSA      SHA256:/wjFi9wpwwpGSMmfgbbG6qCFbVC+rr4ebsJLfADMFPQ
-```
-
-Client caveat: on a machine without an IPv6 default route, `cloudflared
-access ssh` dials the edge's AAAA first and fails with `no route to host`
-instead of falling back to A. The operator's Mac hit exactly this; the fix is
-IPv6 connectivity on the client, not anything on the server. A plain HTTPS
-`GET` to an `ssh`-type Access app returns 403 even from an allowed IP, so
-`curl` is not a positive test for this app type — only `ssh` is.
-
-## Not done
-
-- No Cloudflare Access or allow-list (operator's choice, above).
-- No mTLS between nginx and the daemon — both are on the same host and the
-  daemon accepts only loopback peers.
-- The system unit and nginx config are hand-written for this host;
-  `bsc service install --system` does not exist yet.
-- `bsc doctor` cannot check file permissions on a remote vault.
-- The origin's direct reachability on the public IP (above) is not mitigated.
-- The positive SSH test was observed from the host's own egress, not yet
-  from `172.216.48.153` or `59.124.17.34`.
-- The Cloudflare API token used for the setup should now be revoked or
-  narrowed by the operator; it was read from a file and never printed.
 
 ## Daily ledger anchor
 
@@ -245,5 +137,13 @@ root. The anchor directory is root-only, so the `bsc` service user — the only
 identity that can write the vault — cannot rewrite the anchors to match a
 truncated ledger. Install with the commands in the unit's header; check with
 `systemctl list-timers bsc-anchor.timer` and `journalctl -u bsc-anchor`. An
-inconsistent anchor makes the unit fail, which shows up in `systemctl
---failed`; wire that to whatever already watches the host.
+inconsistent anchor makes the unit fail, which shows up in
+`systemctl --failed`; wire that into whatever already watches the host.
+
+## Not done
+
+- No `bsc service install --system`: the system unit and nginx config are
+  written by hand from the files in `deploy/`.
+- No mTLS between nginx and the daemon — both are on the same host and the
+  daemon accepts only loopback peers.
+- `bsc doctor` cannot check file permissions on a remote vault.

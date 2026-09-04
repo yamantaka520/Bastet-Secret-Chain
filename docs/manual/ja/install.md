@@ -217,7 +217,7 @@ systemctl status bsc
 
 ### 4.3 nginx と TLS
 
-[`deploy/nginx-sec.bastet.tw.conf`](../../../deploy/nginx-sec.bastet.tw.conf) を
+[`deploy/nginx-bsc.conf`](../../../deploy/nginx-bsc.conf) を
 出発点にしてください。重要な点は次のとおりです。
 
 - 本物の証明書と、HTTP から HTTPS へのリダイレクト。
