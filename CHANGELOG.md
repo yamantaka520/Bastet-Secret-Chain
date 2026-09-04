@@ -6,6 +6,17 @@ release exists. Until then every change lands under `Unreleased`.
 
 ## [Unreleased]
 
+- **Removed: deployment specifics from the public repository.** The
+  reverse-proxy document had accumulated one deployment's internal address,
+  host names, OS versions, public hostnames, tunnel and Access identifiers,
+  an SSH allow-list, SSH accounts and host key fingerprints, and a chat id.
+  It is now the recipe and the reasoning with `example.com` throughout; the
+  SSH-over-tunnel section and `deploy/cloudflare-ssh-tunnel.sh` are gone, as
+  infrastructure work that is not part of this product. CI now fails on a
+  real-looking address, a host key fingerprint or a tunnel id in `docs/`,
+  `deploy/` or `scripts/`, and `AGENTS.md` states the rule. No credential
+  material was ever committed — the full history was scanned.
+
 - **Added: manuals in five languages.** `docs/manual/` carries an
   installation manual, a user guide and an AI-agent guide in Traditional
   Chinese, Simplified Chinese, English, Japanese and Korean, all sharing one

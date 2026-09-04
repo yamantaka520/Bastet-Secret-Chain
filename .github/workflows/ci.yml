@@ -159,6 +159,26 @@ jobs:
             echo "credential-shaped content found"; exit 1
           fi
           echo "clean"
+      - name: Scan documentation for deployment specifics
+        # A credential vault's repository is a map of where the credentials
+        # live. Documentation and deploy files describe how to run this
+        # software, never where one particular copy of it runs: no real
+        # addresses, no host names, no key fingerprints, no tunnel ids.
+        # Rust tests may use fixture addresses; documentation may not.
+        run: |
+          set -e
+          bad=0
+          # IPv4 literals outside the ranges reserved for documentation,
+          # loopback, and the link-local metadata address used in prose.
+          if grep -rnE '\b(([0-9]{1,3})\.){3}[0-9]{1,3}\b' docs deploy scripts *.md \
+               | grep -vE '127\.0\.0\.1|0\.0\.0\.0|255\.255|169\.254\.169\.254|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.|\b[0-9]+\.[0-9]+\.[0-9]+\b *(passes|MiB|GiB)|SHA256|v?[0-9]+\.[0-9]+\.[0-9]+' ; then
+            echo "^ a real-looking IP address in documentation"; bad=1
+          fi
+          if grep -rnE 'SHA256:[A-Za-z0-9+/]{40,}|[0-9a-f-]{36}\.cfargotunnel\.com' docs deploy scripts *.md ; then
+            echo "^ a host key fingerprint or tunnel id in documentation"; bad=1
+          fi
+          [ "$bad" = 0 ] || { echo "Deployment specifics belong in your own notes, not in a public repository."; exit 1; }
+          echo "clean"
 
   supply-chain:
     name: Dependencies (licences, bans, sources)
